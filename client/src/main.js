@@ -190,7 +190,7 @@ document.querySelectorAll(".deposit-btn").forEach((btn) => {
     depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
     try {
       const sig = await walletMgr.sendSol(walletInfo.houseWallet, solAmount);
-      depositStatus.textContent = "Verifying transaction...";
+      depositStatus.textContent = "Verifying on-chain (this may take up to 30s)...";
       socketClient.verifyDeposit(sig, solAmount);
     } catch (err) {
       depositStatus.textContent = `Error: ${err.message}`;

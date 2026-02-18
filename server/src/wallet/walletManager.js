@@ -127,30 +127,51 @@ export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
   return deposits;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export async function verifyDeposit(connection, signature, expectedLamports, houseWallet) {
-  try {
-    const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
-    if (!tx || !tx.meta) return { valid: false, reason: "Transaction not found. It may take a few seconds to confirm -- try again shortly." };
-    if (tx.meta.err) return { valid: false, reason: "Transaction failed on-chain" };
+  const MAX_RETRIES = 8;
+  const RETRY_DELAY_MS = 3000;
 
-    const received = findHouseDeposit(tx, houseWallet);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
 
-    if (received <= 0) {
-      const keys = getAllAccountKeys(tx);
-      const houseFound = keys.includes(houseWallet);
-      if (!houseFound) {
-        return { valid: false, reason: "House wallet not found in transaction. Make sure you sent SOL to the correct address." };
+      if (!tx || !tx.meta) {
+        if (attempt < MAX_RETRIES - 1) {
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        return { valid: false, reason: "Transaction not found after waiting. It may still be processing -- try refreshing your balance in a minute." };
       }
-      return { valid: false, reason: `No SOL received by house wallet. Balance change was non-positive. Verify you sent to: ${houseWallet.slice(0,6)}...${houseWallet.slice(-4)}` };
-    }
 
-    if (received < expectedLamports * 0.90) {
-      return { valid: false, reason: `Amount too low: received ${(received / LAMPORTS_PER_SOL).toFixed(6)} SOL, expected ~${(expectedLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL` };
-    }
+      if (tx.meta.err) return { valid: false, reason: "Transaction failed on-chain" };
 
-    processedSignatures.add(signature);
-    return { valid: true, lamports: received };
-  } catch (err) {
-    return { valid: false, reason: err.message };
+      const received = findHouseDeposit(tx, houseWallet);
+
+      if (received <= 0) {
+        const keys = getAllAccountKeys(tx);
+        const houseFound = keys.includes(houseWallet);
+        if (!houseFound) {
+          return { valid: false, reason: "House wallet not found in transaction. Make sure you sent SOL to the correct address." };
+        }
+        return { valid: false, reason: `No SOL received by house wallet. Verify you sent to: ${houseWallet.slice(0,6)}...${houseWallet.slice(-4)}` };
+      }
+
+      if (received < expectedLamports * 0.90) {
+        return { valid: false, reason: `Amount too low: received ${(received / LAMPORTS_PER_SOL).toFixed(6)} SOL, expected ~${(expectedLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL` };
+      }
+
+      processedSignatures.add(signature);
+      return { valid: true, lamports: received };
+    } catch (err) {
+      if (attempt < MAX_RETRIES - 1) {
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      return { valid: false, reason: err.message };
+    }
   }
+
+  return { valid: false, reason: "Verification timed out. Try refreshing your balance." };
 }
