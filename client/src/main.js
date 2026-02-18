@@ -48,6 +48,7 @@ socketClient.connect();
 socketClient.on("wallet:info", (data) => {
   walletInfo = data;
   entryFeeUsd = data.entryFeeUsd;
+  if (data.rpcUrl) walletMgr.setRpc(data.rpcUrl);
 });
 socketClient.requestWalletInfo();
 

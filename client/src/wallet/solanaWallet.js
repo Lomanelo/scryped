@@ -2,6 +2,7 @@ export function createWalletManager() {
   let provider = null;
   let publicKey = null;
   let connected = false;
+  let rpcUrl = "https://api.mainnet-beta.solana.com";
 
   function getProvider() {
     if (window.solana?.isPhantom) return window.solana;
@@ -33,7 +34,7 @@ export function createWalletManager() {
     if (!provider || !connected) throw new Error("Wallet not connected");
 
     const { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = await import("https://esm.sh/@solana/web3.js@1.95.8");
-    const connection = new Connection("https://api.mainnet-beta.solana.com");
+    const connection = new Connection(rpcUrl);
 
     const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
     const transaction = new Transaction().add(
@@ -59,6 +60,7 @@ export function createWalletManager() {
     connect,
     disconnect,
     sendSol,
+    setRpc: (url) => { rpcUrl = url; },
     isConnected: () => connected,
     getPublicKey: () => publicKey,
     hasWallet: () => !!getProvider()

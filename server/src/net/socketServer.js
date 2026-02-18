@@ -79,7 +79,8 @@ export function attachSocketServer(io, gameLoop, state, config) {
         entryFeeUsd: getEntryFeeUsd(),
         entryFeeSol,
         solPrice,
-        houseFeePercent: getHouseFee() * 100
+        houseFeePercent: getHouseFee() * 100,
+        rpcUrl: RPC_URL
       });
     });
 
