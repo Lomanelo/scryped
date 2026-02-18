@@ -8,7 +8,7 @@ import {
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 const DUMMY_ID = "dummy:target";
-const HOUSE_WALLET = process.env.HOUSE_WALLET || "YOUR_SOLANA_WALLET_ADDRESS_HERE";
+const HOUSE_WALLET = (process.env.HOUSE_WALLET || "YOUR_SOLANA_WALLET_ADDRESS_HERE").trim();
 const RPC_URL = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const connection = new Connection(RPC_URL);
 

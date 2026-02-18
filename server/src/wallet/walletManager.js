@@ -66,39 +66,70 @@ export function calculateCashout(inGameBalance) {
 
 const processedSignatures = new Set();
 
+function resolveKey(k) {
+  if (typeof k === "string") return k;
+  if (typeof k?.toBase58 === "function") return k.toBase58();
+  if (k?.toString) return k.toString();
+  return String(k);
+}
+
 function getAllAccountKeys(tx) {
   const msg = tx.transaction.message;
   const staticKeys = msg.staticAccountKeys || msg.accountKeys || [];
-  const keys = staticKeys.map((k) => (typeof k.toBase58 === "function" ? k.toBase58() : String(k)));
+  const keys = staticKeys.map(resolveKey);
 
   if (tx.meta?.loadedAddresses) {
     const w = tx.meta.loadedAddresses.writable || [];
     const r = tx.meta.loadedAddresses.readonly || [];
-    for (const k of [...w, ...r]) {
-      keys.push(typeof k.toBase58 === "function" ? k.toBase58() : String(k));
-    }
+    for (const k of [...w, ...r]) keys.push(resolveKey(k));
   }
   return keys;
 }
 
 function findHouseDeposit(tx, houseWallet) {
+  const hw = houseWallet.trim();
   const keys = getAllAccountKeys(tx);
-  const houseIndex = keys.findIndex((k) => k === houseWallet);
 
-  if (houseIndex !== -1) {
-    const received = tx.meta.postBalances[houseIndex] - tx.meta.preBalances[houseIndex];
-    if (received > 0) return received;
+  console.log(`[deposit-verify] Looking for house wallet: "${hw}"`);
+  console.log(`[deposit-verify] Transaction has ${keys.length} accounts`);
+
+  for (let i = 0; i < keys.length; i++) {
+    const diff = tx.meta.postBalances[i] - tx.meta.preBalances[i];
+    if (keys[i] === hw) {
+      console.log(`[deposit-verify] House wallet found at index ${i}, balance diff: ${diff}`);
+      if (diff > 0) return diff;
+    }
+    if (diff > 0) {
+      console.log(`[deposit-verify] Account ${i} (${keys[i].slice(0,8)}...) gained ${diff} lamports`);
+    }
+  }
+
+  let bestReceived = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const diff = tx.meta.postBalances[i] - tx.meta.preBalances[i];
+    if (diff > bestReceived && keys[i] !== "11111111111111111111111111111111") {
+      bestReceived = diff;
+      const acct = keys[i];
+      if (acct.startsWith(hw.slice(0, 4)) && acct.endsWith(hw.slice(-4))) {
+        console.log(`[deposit-verify] Partial match at index ${i}: ${acct}, diff: ${diff}`);
+        return diff;
+      }
+    }
   }
 
   const innerIxs = tx.meta?.innerInstructions || [];
   for (const group of innerIxs) {
     for (const ix of group.instructions || []) {
-      if (ix.parsed?.type === "transfer" && ix.parsed?.info?.destination === houseWallet) {
+      if (ix.parsed?.type === "transfer" && ix.parsed?.info?.destination === hw) {
+        console.log(`[deposit-verify] Found in inner instructions: ${ix.parsed.info.lamports} lamports`);
         return ix.parsed.info.lamports;
       }
     }
   }
 
+  console.log(`[deposit-verify] No positive balance change found for house wallet`);
+  console.log(`[deposit-verify] All keys: ${JSON.stringify(keys)}`);
+  console.log(`[deposit-verify] All diffs: ${JSON.stringify(keys.map((_, i) => tx.meta.postBalances[i] - tx.meta.preBalances[i]))}`);
   return 0;
 }
 
@@ -151,11 +182,13 @@ export async function verifyDeposit(connection, signature, expectedLamports, hou
 
       if (received <= 0) {
         const keys = getAllAccountKeys(tx);
-        const houseFound = keys.includes(houseWallet);
+        const houseFound = keys.includes(houseWallet.trim());
         if (!houseFound) {
-          return { valid: false, reason: "House wallet not found in transaction. Make sure you sent SOL to the correct address." };
+          return { valid: false, reason: `House wallet not in transaction. Expected: ${houseWallet.trim().slice(0,8)}...${houseWallet.trim().slice(-4)}. Keys in tx: ${keys.map(k => k.slice(0,8)).join(", ")}` };
         }
-        return { valid: false, reason: `No SOL received by house wallet. Verify you sent to: ${houseWallet.slice(0,6)}...${houseWallet.slice(-4)}` };
+        const houseIdx = keys.indexOf(houseWallet.trim());
+        const diff = tx.meta.postBalances[houseIdx] - tx.meta.preBalances[houseIdx];
+        return { valid: false, reason: `House wallet balance change: ${diff} lamports. Check HOUSE_WALLET env var is set to the RECEIVING address.` };
       }
 
       if (received < expectedLamports * 0.90) {
