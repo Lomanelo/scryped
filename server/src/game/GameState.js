@@ -5,17 +5,17 @@ export class GameState {
     this.players = new Map();
     this.food = [];
     this.spears = [];
+    this.coins = [];
     this.killEvents = [];
     this.startedAt = Date.now();
   }
 
   randomPosition(padding = 0) {
-    const radius = Math.max(1, (this.config.arenaRadius ?? 250) - padding);
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.sqrt(Math.random()) * radius;
+    const hw = this.config.worldWidth * 0.5 - padding;
+    const hh = this.config.worldHeight * 0.5 - padding;
     return {
-      x: Math.cos(angle) * dist,
-      y: Math.sin(angle) * dist
+      x: (Math.random() - 0.5) * 2 * hw,
+      y: (Math.random() - 0.5) * 2 * hh
     };
   }
 
@@ -45,11 +45,12 @@ export class GameState {
       id: p.id, name: p.name,
       x: p.x, y: p.y, vx: p.vx, vy: p.vy,
       mass: p.mass, radius: p.radius, isBot: p.isBot,
-      hasSpear: p.hasSpear, dashing: !!p.dashing,
+      hasSpear: p.hasSpear, dashing: !!p.dashing, coins: p.coins ?? 0,
       hp: p.hp, maxHp: p.maxHp, dead: !!p.dead,
       facingAngle: p.facingAngle ?? 0, color: p.color,
       kills: p.kills ?? 0, deaths: p.deaths ?? 0,
-      lastDashAt: p.lastDashAt ?? 0, hitTime: p.hitTime ?? 0
+      lastDashAt: p.lastDashAt ?? 0, hitTime: p.hitTime ?? 0,
+      entryFee: p.entryFee ?? 0
     }));
   }
 
@@ -77,11 +78,11 @@ export class GameState {
       tick: this.tick,
       world: {
         width: this.config.worldWidth,
-        height: this.config.worldHeight,
-        arenaRadius: this.config.arenaRadius
+        height: this.config.worldHeight
       },
       players: this.serializePlayers(),
       spears: this.serializeSpears(),
+      coins: this.coins.map((c) => ({ id: c.id, x: c.x, y: c.y, color: c.color, value: c.value ?? 1 })),
       food: this.food,
       leaderboard: this.serializeLeaderboard(),
       killEvents: this.flushKillEvents()

@@ -1,7 +1,18 @@
 import { EVENTS } from "../../../shared/protocol/messages.js";
 import { createInitialPlayer } from "../game/GameLoop.js";
+import {
+  getPlayerBalance, creditPlayer, debitPlayer, calculateCashout,
+  getEntryFeeUsd, getEntryFeeSol, getSolPrice, getHouseFee,
+  verifyDeposit
+} from "../wallet/walletManager.js";
+import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 const DUMMY_ID = "dummy:target";
+const HOUSE_WALLET = process.env.HOUSE_WALLET || "YOUR_SOLANA_WALLET_ADDRESS_HERE";
+const RPC_URL = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
+const connection = new Connection(RPC_URL);
+
+const socketWalletMap = new Map();
 
 function countHumanPlayers(state) {
   let count = 0;
@@ -36,6 +47,7 @@ function syncBots(state, config) {
     const bot = createInitialPlayer({ id: `bot:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`, isBot: true });
     const pos = state.randomPosition(bot.radius + 5);
     bot.x = pos.x; bot.y = pos.y;
+    bot.entryFee = getEntryFeeUsd();
     state.players.set(bot.id, bot);
     currentBots.push(bot);
   }
@@ -58,37 +70,103 @@ function isRateLimited(player, now, config) {
 
 export function attachSocketServer(io, gameLoop, state, config) {
   io.on("connection", (socket) => {
-    if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
-      socket.emit("arena:full");
-      socket.disconnect(true);
-      return;
-    }
 
-    const player = createInitialPlayer({ id: socket.id, isBot: false });
-    const clientName = socket.handshake?.query?.name;
-    if (clientName && clientName.trim().length > 0) {
-      player.name = clientName.trim().slice(0, 16);
-    }
-    const pos = state.randomPosition(player.radius + 3);
-    player.x = pos.x; player.y = pos.y;
-    state.players.set(socket.id, player);
+    socket.on("wallet:get_info", async () => {
+      const solPrice = await getSolPrice();
+      const entryFeeSol = await getEntryFeeSol();
+      socket.emit("wallet:info", {
+        houseWallet: HOUSE_WALLET,
+        entryFeeUsd: getEntryFeeUsd(),
+        entryFeeSol,
+        solPrice,
+        houseFeePercent: getHouseFee() * 100
+      });
+    });
 
-    ensureDummy(state, player);
-    syncBots(state, config);
+    socket.on("wallet:connect", async (data) => {
+      const walletAddress = data?.walletAddress;
+      if (!walletAddress) return socket.emit("wallet:error", { message: "No wallet address" });
 
-    socket.emit(EVENTS.CONNECTED, {
-      playerId: socket.id,
-      dummyId: DUMMY_ID,
-      config: {
-        mode: "arena",
-        tickRate: config.tickRate,
-        arenaRadius: config.arenaRadius,
-        world: { width: config.worldWidth, height: config.worldHeight }
+      socketWalletMap.set(socket.id, walletAddress);
+      const bal = getPlayerBalance(walletAddress);
+      socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
+    });
+
+    socket.on("wallet:deposit_verify", async (data) => {
+      const walletAddress = socketWalletMap.get(socket.id);
+      if (!walletAddress) return socket.emit("wallet:error", { message: "Connect wallet first" });
+
+      const { signature, amountSol } = data;
+      if (!signature) return socket.emit("wallet:error", { message: "No signature" });
+
+      const expectedLamports = Math.floor((amountSol || 0) * LAMPORTS_PER_SOL);
+      const result = await verifyDeposit(connection, signature, expectedLamports, HOUSE_WALLET);
+
+      if (result.valid) {
+        const solPrice = await getSolPrice();
+        const usdAmount = (result.lamports / LAMPORTS_PER_SOL) * solPrice;
+        creditPlayer(walletAddress, usdAmount);
+        const bal = getPlayerBalance(walletAddress);
+        socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
+        socket.emit("wallet:deposit_success", { amount: usdAmount });
+      } else {
+        socket.emit("wallet:error", { message: result.reason });
       }
     });
-    io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
+
+    socket.on("wallet:join_game", (data) => {
+      const walletAddress = socketWalletMap.get(socket.id);
+      if (!walletAddress) return socket.emit("wallet:error", { message: "Connect wallet first" });
+
+      const entryFee = getEntryFeeUsd();
+      const bal = getPlayerBalance(walletAddress);
+
+      if (bal.balance < entryFee) {
+        return socket.emit("wallet:error", { message: `Insufficient balance. Need $${entryFee.toFixed(2)}` });
+      }
+
+      if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
+        socket.emit("arena:full");
+        return;
+      }
+
+      debitPlayer(walletAddress, entryFee);
+
+      const player = createInitialPlayer({ id: socket.id, isBot: false });
+      const clientName = data?.name;
+      if (clientName && clientName.trim().length > 0) {
+        player.name = clientName.trim().slice(0, 16);
+      }
+      const pos = state.randomPosition(player.radius + 3);
+      player.x = pos.x; player.y = pos.y;
+      player.walletAddress = walletAddress;
+      player.entryFee = entryFee;
+      player.inGameBalance = entryFee;
+      state.players.set(socket.id, player);
+
+      ensureDummy(state, player);
+      syncBots(state, config);
+
+      const newBal = getPlayerBalance(walletAddress);
+      socket.emit("wallet:balance", { balance: newBal.balance, walletAddress });
+
+      socket.emit(EVENTS.CONNECTED, {
+        playerId: socket.id,
+        dummyId: DUMMY_ID,
+        config: {
+          mode: "arena",
+          tickRate: config.tickRate,
+          world: { width: config.worldWidth, height: config.worldHeight }
+        },
+        inGameBalance: player.inGameBalance,
+        entryFee
+      });
+      io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
+    });
 
     socket.on(EVENTS.INPUT, (payload) => {
+      const player = state.players.get(socket.id);
+      if (!player) return;
       const now = Date.now();
       if (isRateLimited(player, now, config)) return;
       gameLoop.ingestInput(player, payload ?? {});
@@ -100,15 +178,56 @@ export function attachSocketServer(io, gameLoop, state, config) {
       gameLoop.ingestInput(dummy, payload ?? {});
     });
 
-    socket.on("disconnect", () => {
+    socket.on("cashout", () => {
+      const player = state.players.get(socket.id);
+      if (!player) return;
+      const walletAddress = socketWalletMap.get(socket.id);
+      if (!walletAddress) return;
+
+      const coins = player.coins ?? 0;
+      const inGameBalance = player.entryFee + coins;
+      const { payout, fee } = calculateCashout(inGameBalance);
+
+      creditPlayer(walletAddress, payout);
+
       state.players.delete(socket.id);
       state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
+
+      const bal = getPlayerBalance(walletAddress);
+      socket.emit("cashout:success", {
+        grossAmount: inGameBalance,
+        fee,
+        netPayout: payout,
+        walletBalance: bal.balance
+      });
+
       if (countHumanPlayers(state) === 0) {
         removeDummy(state);
         for (const p of state.players.values()) {
           if (p.isBot) state.players.delete(p.id);
         }
         state.spears = [];
+        state.coins = [];
+      }
+      syncBots(state, config);
+      io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });
+    });
+
+    socket.on("disconnect", () => {
+      const player = state.players.get(socket.id);
+      if (player && !player.isBot) {
+        // Player loses their in-game balance on disconnect (no cashout)
+      }
+      state.players.delete(socket.id);
+      state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
+      socketWalletMap.delete(socket.id);
+      if (countHumanPlayers(state) === 0) {
+        removeDummy(state);
+        for (const p of state.players.values()) {
+          if (p.isBot) state.players.delete(p.id);
+        }
+        state.spears = [];
+        state.coins = [];
       }
       syncBots(state, config);
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });

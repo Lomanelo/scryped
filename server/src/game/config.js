@@ -1,9 +1,8 @@
 export const GAME_CONFIG = {
   tickRate: 60,
   snapshotRate: 30,
-  worldWidth: 600,
-  worldHeight: 600,
-  arenaRadius: 250,
+  worldWidth: 3000,
+  worldHeight: 3000,
   maxPlayersPerArena: 8,
   aiEnabled: true,
   aiFillPlayers: 2,

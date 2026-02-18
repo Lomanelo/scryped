@@ -141,18 +141,34 @@ export class GameLoop {
           if (len > 0.01) { moveX /= len; moveY /= len; }
         }
 
-        const dashCooldownMs = 1500;
+        const dashCooldownMs = 2000;
         const canDash = now - (bot.lastDashAt ?? 0) >= dashCooldownMs;
         const wantsDash = canDash && nearDist < BOOM_MAX_DIST * 0.5 && Math.random() > 0.95;
 
         bot.lastInput = { moveX, moveY, shoot: wantsToShoot, dash: wantsDash, facingAngle: aimAngle };
       } else if (!dodging) {
-        bot.aiWander = (bot.aiWander ?? 0) - dt;
-        if (bot.aiWander <= 0) {
-          const angle = Math.random() * Math.PI * 2;
-          bot.lastInput = { moveX: Math.cos(angle), moveY: Math.sin(angle), shoot: false, dash: false, facingAngle: angle };
-          bot.facingAngle = angle;
-          bot.aiWander = 0.8 + Math.random() * 1.6;
+        // Check for nearby coins to pick up
+        let nearestCoin = null;
+        let coinDist = Infinity;
+        for (const coin of this.state.coins) {
+          const d = Math.hypot(coin.x - bot.x, coin.y - bot.y);
+          if (d < coinDist) { coinDist = d; nearestCoin = coin; }
+        }
+
+        if (nearestCoin && coinDist < 150) {
+          const dx = nearestCoin.x - bot.x;
+          const dy = nearestCoin.y - bot.y;
+          const norm = normalizeVector(dx, dy);
+          bot.lastInput = { moveX: norm.x, moveY: norm.y, shoot: false, dash: false, facingAngle: Math.atan2(dy, dx) };
+          bot.facingAngle = Math.atan2(dy, dx);
+        } else {
+          bot.aiWander = (bot.aiWander ?? 0) - dt;
+          if (bot.aiWander <= 0) {
+            const angle = Math.random() * Math.PI * 2;
+            bot.lastInput = { moveX: Math.cos(angle), moveY: Math.sin(angle), shoot: false, dash: false, facingAngle: angle };
+            bot.facingAngle = angle;
+            bot.aiWander = 0.8 + Math.random() * 1.6;
+          }
         }
       }
     }
@@ -161,7 +177,7 @@ export class GameLoop {
   processDashes() {
     const DASH_DIST = 55;
     const DASH_DURATION = 0.12;
-    const DASH_COOLDOWN_MS = 1500;
+    const DASH_COOLDOWN_MS = 2000;
     const now = Date.now();
 
     for (const player of this.state.players.values()) {
@@ -183,7 +199,8 @@ export class GameLoop {
   }
 
   movePlayers(dt) {
-    const arenaR = this.config.arenaRadius ?? 9999;
+    const hw = this.config.worldWidth * 0.5;
+    const hh = this.config.worldHeight * 0.5;
     for (const player of this.state.players.values()) {
       if (player.dead) continue;
       if (player.dashing && player.dashTimeLeft > 0) {
@@ -202,12 +219,10 @@ export class GameLoop {
         player.y += player.vy * dt;
       }
 
-      const dist = Math.hypot(player.x, player.y);
-      const maxDist = Math.max(0, arenaR - player.radius);
-      if (dist > maxDist && dist > 0.001) {
-        player.x *= maxDist / dist;
-        player.y *= maxDist / dist;
-      }
+      const maxX = hw - player.radius;
+      const maxY = hh - player.radius;
+      player.x = Math.max(-maxX, Math.min(maxX, player.x));
+      player.y = Math.max(-maxY, Math.min(maxY, player.y));
     }
   }
 
@@ -316,6 +331,16 @@ export class GameLoop {
           player.deadSince = Date.now();
           player.deaths = (player.deaths ?? 0) + 1;
 
+          const coinValue = (player.coins ?? 0) + 1;
+          this.state.coins.push({
+            id: `coin:${player.id}:${Date.now()}`,
+            x: player.x, y: player.y,
+            value: coinValue,
+            color: player.color || "#f5c542",
+            droppedBy: player.id
+          });
+          player.coins = 0;
+
           if (owner) {
             owner.kills = (owner.kills ?? 0) + 1;
             owner.score += 10;
@@ -370,6 +395,24 @@ export class GameLoop {
     }
   }
 
+  collectCoins() {
+    const PICKUP_RADIUS = 1.5;
+    for (const player of this.state.players.values()) {
+      if (player.dead) continue;
+      for (let i = this.state.coins.length - 1; i >= 0; i--) {
+        const coin = this.state.coins[i];
+        const dx = player.x - coin.x;
+        const dy = player.y - coin.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < player.radius * PICKUP_RADIUS) {
+          player.coins = (player.coins ?? 0) + (coin.value ?? 1);
+          player.score += 5 * (coin.value ?? 1);
+          this.state.coins.splice(i, 1);
+        }
+      }
+    }
+  }
+
   step() {
     const dt = this.tickMs / 1000;
     this.state.tick += 1;
@@ -379,6 +422,7 @@ export class GameLoop {
     this.processShots();
     this.moveSpears(dt);
     this.boomerangHitPlayers();
+    this.collectCoins();
     this.consumeFood();
     this.decayMass(dt);
 
@@ -399,7 +443,7 @@ export function createInitialPlayer({ id, isBot = false }) {
     hp: 3, maxHp: 3, dead: false,
     hasSpear: true, lastShotAt: 0, lastDashAt: 0,
     facingAngle: 0, color: nextColor(),
-    kills: 0, deaths: 0, hitTime: 0,
+    kills: 0, deaths: 0, hitTime: 0, coins: 0, entryFee: 1,
     lastInput: { moveX: 0, moveY: 0, shoot: false, dash: false, facingAngle: 0 },
     lastInputAt: 0, aiWander: 0
   };

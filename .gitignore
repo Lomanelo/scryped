@@ -1,9 +1,5 @@
 node_modules/
-npm-debug.log*
-node_modules/
-build/
-.firebase/
 .env
-.env.local
-firebase/functions/node_modules/
-.emulator-data/
+*.log
+.DS_Store
+Thumbs.db

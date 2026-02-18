@@ -44,8 +44,8 @@ server.on("error", (error) => {
   throw error;
 });
 
-server.listen(port, () => {
+server.listen(port, "0.0.0.0", () => {
   gameLoop.start();
   // eslint-disable-next-line no-console
-  console.log(`Agar arena server running at http://localhost:${port}`);
+  console.log(`Snapback.io server running at http://0.0.0.0:${port}`);
 });

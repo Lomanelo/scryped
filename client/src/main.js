@@ -1,10 +1,12 @@
 import { createSocketClient } from "./net/socketClient.js";
 import { createControls } from "./input/controls.js";
 import { createHud } from "./ui/hud.js";
+import { createWalletManager } from "./wallet/solanaWallet.js";
 
 const appEl = document.getElementById("app");
 const hud = createHud();
 const socketClient = createSocketClient();
+const walletMgr = createWalletManager();
 
 const canvas = document.createElement("canvas");
 canvas.style.width = "100%";
@@ -16,23 +18,143 @@ const ctx = canvas.getContext("2d");
 const controls = createControls(canvas);
 
 let gameStarted = false;
+let walletBalance = 0;
+let walletInfo = null;
+let entryFeeUsd = 1;
+let qHoldStart = 0;
+let qHolding = false;
+const Q_HOLD_DURATION = 3000;
 
 const startScreen = document.getElementById("startScreen");
 const nameInput = document.getElementById("nameInput");
-const playBtn = document.getElementById("playBtn");
+const joinBtn = document.getElementById("joinBtn");
 const hudEl = document.getElementById("hud");
+const connectWalletBtn = document.getElementById("connectWalletBtn");
+const walletAddrEl = document.getElementById("walletAddr");
+const walletBalEl = document.getElementById("walletBal");
+const walletConnectedActions = document.getElementById("walletConnectedActions");
+const depositBtn = document.getElementById("depositBtn");
+const depositModal = document.getElementById("depositModal");
+const depositStatus = document.getElementById("depositStatus");
+const depositClose = document.getElementById("depositClose");
+const cashoutOverlay = document.getElementById("cashoutOverlay");
+const cashoutAmountEl = document.getElementById("cashoutAmount");
+const cashoutCanvas = document.getElementById("cashoutCanvas");
+const cashoutCtx = cashoutCanvas.getContext("2d");
+const cashoutResultModal = document.getElementById("cashoutResultModal");
 
-function startGame() {
-  const name = nameInput.value.trim() || "";
+socketClient.connect();
+
+socketClient.on("wallet:info", (data) => {
+  walletInfo = data;
+  entryFeeUsd = data.entryFeeUsd;
+});
+socketClient.requestWalletInfo();
+
+socketClient.on("wallet:balance", (data) => {
+  walletBalance = data.balance;
+  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
+  updateJoinBtn();
+});
+
+socketClient.on("wallet:error", (data) => {
+  depositStatus.textContent = data.message;
+});
+
+socketClient.on("wallet:deposit_success", (data) => {
+  depositStatus.textContent = `Deposited $${data.amount.toFixed(2)}!`;
+  setTimeout(() => { depositModal.style.display = "none"; depositStatus.textContent = ""; }, 2000);
+});
+
+socketClient.on("game:started", () => {
   startScreen.style.display = "none";
   if (hudEl) hudEl.style.display = "";
-  socketClient.connect(name);
   gameStarted = true;
+});
+
+socketClient.on("cashout:success", (data) => {
+  gameStarted = false;
+  walletBalance = data.walletBalance;
+  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
+  document.getElementById("crGross").textContent = `$${data.grossAmount.toFixed(2)}`;
+  document.getElementById("crFee").textContent = `-$${data.fee.toFixed(2)}`;
+  document.getElementById("crNet").textContent = `$${data.netPayout.toFixed(2)}`;
+  cashoutResultModal.style.display = "flex";
+  cashoutOverlay.style.display = "none";
+  updateJoinBtn();
+});
+
+document.getElementById("crClose").addEventListener("click", () => {
+  cashoutResultModal.style.display = "none";
+  startScreen.style.display = "";
+});
+
+function updateJoinBtn() {
+  if (walletMgr.isConnected() && walletBalance >= entryFeeUsd) {
+    joinBtn.classList.remove("btn-disabled");
+  } else {
+    joinBtn.classList.add("btn-disabled");
+  }
 }
 
-playBtn.addEventListener("click", startGame);
+connectWalletBtn.addEventListener("click", async () => {
+  try {
+    const pubkey = await walletMgr.connect();
+    walletAddrEl.textContent = pubkey.slice(0, 4) + "..." + pubkey.slice(-4);
+    connectWalletBtn.style.display = "none";
+    walletConnectedActions.style.display = "flex";
+    socketClient.connectWallet(pubkey);
+  } catch (err) {
+    walletAddrEl.textContent = err.message;
+  }
+});
+
+depositBtn.addEventListener("click", () => { depositModal.style.display = "flex"; });
+depositClose.addEventListener("click", () => { depositModal.style.display = "none"; depositStatus.textContent = ""; });
+
+document.querySelectorAll(".deposit-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const usd = parseFloat(btn.dataset.usd);
+    if (!walletMgr.isConnected() || !walletInfo) return;
+    const solAmount = usd / walletInfo.solPrice;
+    depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
+    try {
+      const sig = await walletMgr.sendSol(walletInfo.houseWallet, solAmount);
+      depositStatus.textContent = "Verifying transaction...";
+      socketClient.verifyDeposit(sig, solAmount);
+    } catch (err) {
+      depositStatus.textContent = `Error: ${err.message}`;
+    }
+  });
+});
+
+document.getElementById("cashOutBtn")?.addEventListener("click", () => {
+  if (walletBalance > 0) {
+    alert(`Your balance: $${walletBalance.toFixed(2)}\nWithdrawal to wallet coming soon.`);
+  }
+});
+
+joinBtn.addEventListener("click", () => {
+  if (!walletMgr.isConnected() || walletBalance < entryFeeUsd) return;
+  const name = nameInput.value.trim() || "";
+  socketClient.joinGame(name);
+});
 nameInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") startGame();
+  if (e.key === "Enter") joinBtn.click();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "KeyQ" && !e.repeat && gameStarted) {
+    qHolding = true;
+    qHoldStart = Date.now();
+    cashoutOverlay.style.display = "";
+  }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.code === "KeyQ") {
+    qHolding = false;
+    cashoutOverlay.style.display = "none";
+  }
 });
 
 let snapshot = null;
@@ -40,8 +162,8 @@ let seq = 0;
 let serverX = 0, serverY = 0, renderX = 0, renderY = 0;
 let localRadius = 10, localName = "", localHasSpear = true;
 let localHp = 3, localMaxHp = 3, localDead = false;
-let localColor = "#7cf7b2", localKills = 0, localDeaths = 0, localLastDashAt = 0;
-let arenaRadius = 250, currentZoom = 6, facingAngle = 0;
+let localColor = "#7cf7b2", localKills = 0, localDeaths = 0, localCoins = 0, localLastDashAt = 0;
+let worldWidth = 3000, worldHeight = 3000, currentZoom = 6, facingAngle = 0, showRangeCircle = true;
 let lastTime = performance.now(), spinAngle = 0;
 let lastInputSend = 0;
 const INPUT_SEND_INTERVAL = 1000 / 30;
@@ -55,12 +177,17 @@ const MAX_TRAIL = 8;
 const hitParticles = [];
 const deathParticles = [];
 
+window.addEventListener("keydown", (e) => {
+  if (e.code === "KeyC" && !e.repeat) showRangeCircle = !showRangeCircle;
+});
+
 const killFeed = [];
 const KILL_FEED_MAX = 5;
 const KILL_FEED_DURATION = 4;
 
 const boomerangTrails = {};
 const otherPlayerRender = {};
+const playerDashState = {};
 
 function getTargetZoom(radius) { return Math.max(0.35, 60 / (radius + 4)); }
 
@@ -83,18 +210,19 @@ socketClient.onSnapshot((next) => {
   snapshot = next;
   const localId = socketClient.getPlayerId();
   const me = next.players.find((p) => p.id === localId);
-  if (next.world?.arenaRadius) arenaRadius = next.world.arenaRadius;
+  if (next.world?.width) worldWidth = next.world.width;
+  if (next.world?.height) worldHeight = next.world.height;
 
   if (me) {
     serverX = me.x; serverY = me.y;
     localRadius = me.radius; localName = me.name;
     localHasSpear = me.hasSpear; localHp = me.hp; localMaxHp = me.maxHp;
     localDead = me.dead; localColor = me.color || "#7cf7b2";
-    localKills = me.kills ?? 0; localDeaths = me.deaths ?? 0;
-    localLastDashAt = me.lastDashAt ?? 0;
+    localKills = me.kills ?? 0; localDeaths = me.deaths ?? 0; localCoins = me.coins ?? 0;
     prevHp = me.hp;
 
     if (me.dashing && !prevDashing) {
+      localLastDashAt = Date.now() - 80;
       dashTimer = DASH_ANIM_DURATION;
       const mag = Math.hypot(me.vx, me.vy);
       if (mag > 0.1) { dashDirX = me.vx / mag; dashDirY = me.vy / mag; }
@@ -115,6 +243,15 @@ socketClient.onSnapshot((next) => {
       if (!otherPlayerRender[p.id]) otherPlayerRender[p.id] = { x: p.x, y: p.y };
       otherPlayerRender[p.id].targetX = p.x;
       otherPlayerRender[p.id].targetY = p.y;
+
+      if (!playerDashState[p.id]) playerDashState[p.id] = { prev: false, timer: 0, dirX: 0, dirY: 0, trail: [] };
+      const ds = playerDashState[p.id];
+      if (p.dashing && !ds.prev) {
+        ds.timer = DASH_ANIM_DURATION;
+        const mag = Math.hypot(p.vx, p.vy);
+        if (mag > 0.1) { ds.dirX = p.vx / mag; ds.dirY = p.vy / mag; }
+      }
+      ds.prev = p.dashing;
     }
   }
 
@@ -172,15 +309,111 @@ function drawBackground(cameraX, cameraY, zoom) {
   }
 }
 
-function drawArenaBoundary(cameraX, cameraY, zoom) {
-  const center = worldToScreen(0, 0, cameraX, cameraY, zoom);
-  const r = arenaRadius * zoom;
+function drawWorldBorder(cameraX, cameraY, zoom) {
+  const hw = worldWidth * 0.5, hh = worldHeight * 0.5;
+  const tl = worldToScreen(-hw, -hh, cameraX, cameraY, zoom);
+  const br = worldToScreen(hw, hh, cameraX, cameraY, zoom);
+  const w = br.x - tl.x, h = br.y - tl.y;
+
   ctx.save();
-  ctx.setLineDash([16, 10]); ctx.strokeStyle = "rgba(255,80,80,0.25)"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(center.x, center.y, r, 0, Math.PI * 2); ctx.stroke();
-  ctx.setLineDash([]); ctx.strokeStyle = "rgba(255,80,80,0.06)"; ctx.lineWidth = 12;
-  ctx.beginPath(); ctx.arc(center.x, center.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = "rgba(255,80,80,0.3)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([16, 10]);
+  ctx.strokeRect(tl.x, tl.y, w, h);
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = "rgba(255,80,80,0.06)";
+  ctx.lineWidth = 12;
+  ctx.strokeRect(tl.x, tl.y, w, h);
   ctx.restore();
+}
+
+function drawMinimap() {
+  const SIZE = 150;
+  const PADDING = 12;
+  const mx = canvas.width - SIZE - PADDING;
+  const my = canvas.height - SIZE - PADDING;
+
+  ctx.save();
+
+  ctx.fillStyle = "rgba(10, 15, 26, 0.75)";
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(mx, my, SIZE, SIZE, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.roundRect(mx, my, SIZE, SIZE, 6);
+  ctx.clip();
+
+  const scaleX = SIZE / worldWidth;
+  const scaleY = SIZE / worldHeight;
+
+  if (snapshot) {
+    const localId = socketClient.getPlayerId();
+    for (const coin of (snapshot.coins || [])) {
+      const cx = mx + (coin.x + worldWidth * 0.5) * scaleX;
+      const cy = my + (coin.y + worldHeight * 0.5) * scaleY;
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    for (const p of snapshot.players) {
+      if (p.dead) continue;
+      const px = mx + (p.x + worldWidth * 0.5) * scaleX;
+      const py = my + (p.y + worldHeight * 0.5) * scaleY;
+      const isLocal = p.id === localId;
+      ctx.fillStyle = isLocal ? "#ffffff" : (p.color || "#ff7a7a");
+      ctx.beginPath();
+      ctx.arc(px, py, isLocal ? 4 : 3, 0, Math.PI * 2);
+      ctx.fill();
+      if (isLocal) {
+        ctx.strokeStyle = p.color || "#7cf7b2";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawCoins(cameraX, cameraY, zoom, time) {
+  if (!snapshot || !snapshot.coins) return;
+  for (const coin of snapshot.coins) {
+    const sp = worldToScreen(coin.x, coin.y, cameraX, cameraY, zoom);
+    const val = coin.value ?? 1;
+    const r = 10 * zoom;
+    const pulse = 1 + Math.sin(time * 4 + coin.x) * 0.08;
+
+    ctx.save();
+    ctx.shadowColor = "#ffd700";
+    ctx.shadowBlur = 10 * zoom;
+
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r * pulse, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(sp.x - r * 0.3, sp.y - r * 0.3, r * 0.1, sp.x, sp.y, r * pulse);
+    grad.addColorStop(0, "#fff7aa");
+    grad.addColorStop(0.4, "#ffd700");
+    grad.addColorStop(1, "#b8860b");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.strokeStyle = "#8B6914";
+    ctx.lineWidth = Math.max(1.5, 1.5 * zoom);
+    ctx.stroke();
+
+    const fontSize = Math.max(8, 9 * zoom);
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.fillStyle = "#8B6914";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(val, sp.x, sp.y + 0.5);
+
+    ctx.restore();
+  }
 }
 
 function drawBoomerang(px, py, size, spin, zoom, fillColor) {
@@ -240,15 +473,15 @@ function drawRangeCircle(px, py, playerRadius, zoom, color) {
 }
 
 function drawEyes(px, py, r, facing) {
-  const eyeOffset = r * 0.3, eyeSize = r * 0.18, pupilSize = eyeSize * 0.55;
+  const eyeOffset = r * 0.28, eyeSize = r * 0.15, pupilSize = eyeSize * 0.55;
   const perpX = -Math.sin(facing), perpY = Math.cos(facing);
   const fwdX = Math.cos(facing), fwdY = Math.sin(facing);
   for (const side of [-1, 1]) {
-    const ex = px + perpX * eyeOffset * side + fwdX * r * 0.35;
-    const ey = py + perpY * eyeOffset * side + fwdY * r * 0.35;
+    const ex = px + perpX * eyeOffset * side + fwdX * r * 0.6;
+    const ey = py + perpY * eyeOffset * side + fwdY * r * 0.6;
     ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#111"; ctx.beginPath();
-    ctx.arc(ex + fwdX * eyeSize * 0.3, ey + fwdY * eyeSize * 0.3, pupilSize, 0, Math.PI * 2); ctx.fill();
+    ctx.arc(ex + fwdX * eyeSize * 0.35, ey + fwdY * eyeSize * 0.35, pupilSize, 0, Math.PI * 2); ctx.fill();
   }
 }
 
@@ -279,20 +512,33 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
   const flashing = hitAge < 150;
   const drawColor = flashing ? "#ff3333" : color;
 
-  drawRangeCircle(px, py, player.radius, zoom, color);
+  if (isLocal && showRangeCircle) drawRangeCircle(px, py, player.radius, zoom, color);
 
   ctx.fillStyle = drawColor; ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = flashing ? "#cc0000" : strokeColor;
   ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.stroke();
 
   drawEyes(px, py, r, fa);
-
-  ctx.fillStyle = "#0a1020";
-  ctx.font = `bold ${Math.max(10, r * 0.3)}px Inter, Arial`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(player.name, px, py + r * 0.5);
-
   drawHearts(px, py, r, player.hp, player.maxHp);
+
+  const coins = player.coins ?? 0;
+  if (coins > 0) {
+    const badgeR = Math.max(7, r * 0.3);
+    ctx.beginPath();
+    ctx.arc(px, py, badgeR, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fill();
+    ctx.strokeStyle = "#ffd700";
+    ctx.lineWidth = Math.max(1.5, badgeR * 0.12);
+    ctx.stroke();
+
+    const fontSize = Math.max(9, badgeR * 1.2);
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffd700";
+    ctx.fillText(coins, px, py + 1);
+  }
 
   if (player.hasSpear) drawHeldBoomerang(px, py, fa, r, zoom, color);
 }
@@ -406,7 +652,7 @@ function drawKillFeed(dt) {
 }
 
 function drawDashCooldownIndicator(px, py, r) {
-  const DASH_COOLDOWN_MS = 1500;
+  const DASH_COOLDOWN_MS = 1700;
   const elapsed = Date.now() - localLastDashAt;
   if (elapsed >= DASH_COOLDOWN_MS) return;
   const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
@@ -422,26 +668,6 @@ function drawDashCooldownIndicator(px, py, r) {
   ctx.fillText("\u21e7", ix, iy); ctx.globalAlpha = 1;
 }
 
-function drawScoreboard() {
-  if (!snapshot) return;
-  ctx.save(); const x = 12; let y = 60;
-  const lb = snapshot.leaderboard ?? [];
-  const localId = socketClient.getPlayerId();
-  ctx.textAlign = "left"; ctx.textBaseline = "top";
-  ctx.globalAlpha = 0.85; ctx.fillStyle = "rgba(0,0,0,0.4)";
-  ctx.beginPath(); ctx.roundRect(x, y - 4, 200, 28 + lb.length * 22, 8); ctx.fill();
-  ctx.globalAlpha = 1; ctx.font = "bold 14px Inter, Arial"; ctx.fillStyle = "#fff";
-  ctx.fillText("Scoreboard", x + 10, y); y += 22;
-  ctx.font = "12px Inter, Arial";
-  for (let i = 0; i < lb.length; i++) {
-    const entry = lb[i]; const isMe = entry.id === localId;
-    ctx.fillStyle = isMe ? "#7cf7b2" : "rgba(255,255,255,0.7)";
-    const suffix = entry.isBot ? " [BOT]" : "";
-    ctx.fillText(`${i + 1}. ${entry.name}${suffix}  K:${entry.kills ?? 0}  D:${entry.deaths ?? 0}`, x + 10, y);
-    y += 20;
-  }
-  ctx.restore();
-}
 
 let prevPlayerStates = {};
 function detectHitsAndDeaths() {
@@ -494,12 +720,47 @@ function tick() {
   detectHitsAndDeaths();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBackground(renderX, renderY, currentZoom);
-  drawArenaBoundary(renderX, renderY, currentZoom);
+  drawWorldBorder(renderX, renderY, currentZoom);
+  drawCoins(renderX, renderY, currentZoom, performance.now() / 1000);
 
   const localId = socketClient.getPlayerId();
   if (snapshot) {
     for (const player of snapshot.players) {
       if (player.id === localId) continue;
+      const ds = playerDashState[player.id];
+      if (ds) {
+        ds.timer -= dt;
+        if (ds.timer > 0 && ds.trail.length < MAX_TRAIL) {
+          const rp = otherPlayerRender[player.id];
+          if (rp) ds.trail.push({ x: rp.x, y: rp.y, life: 1.0 });
+        }
+        // Draw trail ghosts
+        const pr = player.radius * currentZoom;
+        for (let i = 0; i < ds.trail.length; i++) {
+          const ghost = ds.trail[i]; ghost.life -= 0.04;
+          if (ghost.life <= 0) { ds.trail.splice(i, 1); i--; continue; }
+          const gp = worldToScreen(ghost.x, ghost.y, renderX, renderY, currentZoom);
+          ctx.globalAlpha = ghost.life * 0.4; ctx.fillStyle = player.color || "#ff7a7a";
+          ctx.beginPath(); ctx.arc(gp.x, gp.y, pr * ghost.life, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+        }
+
+        if (ds.timer > 0) {
+          const rp = otherPlayerRender[player.id];
+          if (rp) {
+            const sp = worldToScreen(rp.x, rp.y, renderX, renderY, currentZoom);
+            const progress = 1 - (ds.timer / DASH_ANIM_DURATION);
+            ctx.save(); ctx.translate(sp.x, sp.y);
+            const angle = Math.atan2(ds.dirY, ds.dirX);
+            ctx.rotate(angle);
+            ctx.scale(1 + (1 - progress) * 0.35, 1 - (1 - progress) * 0.15);
+            ctx.rotate(-angle); ctx.translate(-sp.x, -sp.y);
+            drawPlayer(player, renderX, renderY, currentZoom, false, dt);
+            ctx.restore();
+            drawSpeedLines(sp.x, sp.y, pr, ds.dirX, ds.dirY, progress);
+            continue;
+          }
+        }
+      }
       drawPlayer(player, renderX, renderY, currentZoom, false, dt);
     }
   }
@@ -555,10 +816,48 @@ function tick() {
   updateAndDrawParticles(deathParticles, renderX, renderY, currentZoom, dt);
 
   drawKillFeed(dt);
-  drawScoreboard();
+  drawMinimap();
+
+  if (qHolding && gameStarted) {
+    const elapsed = Date.now() - qHoldStart;
+    const progress = Math.min(1, elapsed / Q_HOLD_DURATION);
+    const mePlayer = snapshot?.players?.find((pl) => pl.id === socketClient.getPlayerId());
+    const totalCoins = mePlayer?.coins ?? localCoins;
+    const inGameBal = (mePlayer?.entryFee ?? entryFeeUsd) + totalCoins;
+    const payout = inGameBal * (1 - 0.15);
+    cashoutAmountEl.textContent = `$${payout.toFixed(2)}`;
+
+    cashoutCtx.clearRect(0, 0, 128, 128);
+    cashoutCtx.beginPath();
+    cashoutCtx.arc(64, 64, 28, 0, Math.PI * 2);
+    cashoutCtx.fillStyle = "rgba(0,0,0,0.5)";
+    cashoutCtx.fill();
+    cashoutCtx.beginPath();
+    cashoutCtx.arc(64, 64, 28, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress);
+    cashoutCtx.strokeStyle = "#ffd700";
+    cashoutCtx.lineWidth = 5;
+    cashoutCtx.stroke();
+    cashoutCtx.fillStyle = "#fff";
+    cashoutCtx.font = "bold 16px Arial";
+    cashoutCtx.textAlign = "center";
+    cashoutCtx.textBaseline = "middle";
+    cashoutCtx.fillText("Q", 64, 64);
+
+    if (progress >= 1) {
+      qHolding = false;
+      cashoutOverlay.style.display = "none";
+      socketClient.cashout();
+    }
+  }
 
   if (snapshot) {
-    hud.update(snapshot, { x: renderX, y: renderY, mass: 80, radius: localRadius, name: localName, kills: localKills, deaths: localDeaths });
+    const mePlayer = snapshot.players.find((pl) => pl.id === socketClient.getPlayerId());
+    const totalCoins = mePlayer?.coins ?? localCoins;
+    const inGameBal = (mePlayer?.entryFee ?? entryFeeUsd) + totalCoins;
+    hud.update(snapshot, {
+      x: renderX, y: renderY, mass: 80, radius: localRadius, name: localName,
+      kills: localKills, deaths: localDeaths, coins: localCoins, inGameBalance: inGameBal
+    });
   }
 }
 
