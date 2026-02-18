@@ -59,16 +59,21 @@
       }
       .card-title .icon { font-size: 16px; }
 
-      .wallet-card { min-width: 240px; }
-      .wallet-address {
-        font-family: monospace; font-size: 12px; color: rgba(255,255,255,0.5);
-        word-break: break-all; margin-bottom: 12px; min-height: 16px;
+      .wallet-card { min-width: 260px; }
+      .wallet-input {
+        width: 100%; padding: 10px 12px; font-size: 13px; font-family: monospace;
+        border: 1.5px solid rgba(255,255,255,0.12); border-radius: 8px;
+        background: rgba(10,15,26,0.8); color: #f5f7ff; outline: none;
+        margin-bottom: 12px; transition: border-color 0.2s;
       }
+      .wallet-input:focus { border-color: #ffd700; }
+      .wallet-input::placeholder { color: rgba(255,255,255,0.2); font-family: inherit; }
       .wallet-balance {
         font-size: 36px; font-weight: 900; color: #fff; margin-bottom: 4px;
       }
       .wallet-balance-sub { font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 16px; }
       .wallet-actions { display: flex; gap: 8px; }
+
       .btn {
         padding: 10px 20px; font-size: 14px; font-weight: 700; font-family: inherit;
         border: none; border-radius: 8px; cursor: pointer; transition: all 0.15s;
@@ -86,11 +91,6 @@
       .btn-green {
         background: linear-gradient(135deg, #7cf7b2, #3ac97a); color: #0a1020;
         box-shadow: 0 4px 20px rgba(124,247,178,0.3);
-      }
-      .btn-connect {
-        width: 100%; padding: 12px; font-size: 15px;
-        background: linear-gradient(135deg, #9945FF, #7B3FE4); color: #fff;
-        box-shadow: 0 4px 16px rgba(153,69,255,0.3);
       }
       .btn-disabled {
         opacity: 0.4; pointer-events: none;
@@ -150,22 +150,57 @@
       }
       .modal-card {
         background: #0f1628; border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 16px; padding: 28px 32px; min-width: 320px; text-align: center;
+        border-radius: 16px; padding: 28px 32px; min-width: 360px; text-align: center;
       }
-      .modal-card h3 { margin: 0 0 16px; font-size: 20px; }
-      .deposit-amounts { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+      .modal-card h3 { margin: 0 0 6px; font-size: 20px; }
+      .modal-subtitle { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 20px; }
+
+      .deposit-path {
+        background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px; padding: 16px; margin-bottom: 12px; cursor: pointer;
+        transition: border-color 0.15s, background 0.15s; text-align: left;
+      }
+      .deposit-path:hover { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.04); }
+      .deposit-path-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+      .deposit-path-desc { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+      .deposit-amounts { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
       .deposit-btn {
         padding: 12px 24px; font-size: 16px; font-weight: 800;
         border-radius: 10px; cursor: pointer; border: 2px solid rgba(255,215,0,0.3);
         background: rgba(255,215,0,0.08); color: #ffd700; transition: all 0.15s;
       }
       .deposit-btn:hover { background: rgba(255,215,0,0.2); border-color: #ffd700; }
-      .deposit-status { font-size: 13px; color: rgba(255,255,255,0.5); min-height: 20px; margin-bottom: 12px; }
+
+      .house-address-box {
+        background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px; padding: 12px; margin: 12px 0; display: none;
+      }
+      .house-address-label { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+      .house-address-val {
+        font-family: monospace; font-size: 12px; color: #ffd700;
+        word-break: break-all; user-select: all; margin-bottom: 8px;
+      }
+      .copy-btn {
+        padding: 6px 14px; font-size: 12px; font-weight: 700; border: none;
+        border-radius: 6px; background: rgba(255,215,0,0.15); color: #ffd700;
+        cursor: pointer; transition: background 0.15s;
+      }
+      .copy-btn:hover { background: rgba(255,215,0,0.3); }
+
+      .deposit-status { font-size: 13px; color: rgba(255,255,255,0.5); min-height: 20px; margin-bottom: 8px; }
       .modal-close {
         background: none; border: none; color: rgba(255,255,255,0.4); font-size: 14px;
         cursor: pointer; padding: 6px 16px;
       }
       .modal-close:hover { color: #fff; }
+
+      .refresh-bal-btn {
+        padding: 4px 10px; font-size: 11px; font-weight: 600; border: none;
+        border-radius: 5px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
+        cursor: pointer; margin-left: 6px; transition: background 0.15s;
+      }
+      .refresh-bal-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
       #cashoutResultModal {
         position: fixed; inset: 0; z-index: 200; display: none;
@@ -201,13 +236,10 @@
         <div class="main-panel">
           <div class="card wallet-card">
             <div class="card-title"><span class="icon">&#128176;</span> Wallet</div>
-            <div class="wallet-address" id="walletAddr">Not connected</div>
+            <input class="wallet-input" id="walletInput" type="text" placeholder="Paste your Solana address..." autocomplete="off" spellcheck="false" />
             <div class="wallet-balance" id="walletBal">$0.00</div>
-            <div class="wallet-balance-sub">Account Balance</div>
+            <div class="wallet-balance-sub">Account Balance <button class="refresh-bal-btn" id="refreshBalBtn">Refresh</button></div>
             <div class="wallet-actions">
-              <button class="btn btn-connect" id="connectWalletBtn">Connect Wallet</button>
-            </div>
-            <div class="wallet-actions" id="walletConnectedActions" style="display:none; margin-top:8px;">
               <button class="btn btn-gold" id="depositBtn">Add Funds</button>
               <button class="btn btn-outline" id="cashOutBtn">Cash Out</button>
             </div>
@@ -236,12 +268,40 @@
       <div id="depositModal">
         <div class="modal-card">
           <h3>&#128176; Add Funds</h3>
-          <div class="deposit-amounts">
-            <button class="deposit-btn" data-usd="1">$1</button>
-            <button class="deposit-btn" data-usd="5">$5</button>
-            <button class="deposit-btn" data-usd="20">$20</button>
+          <div class="modal-subtitle">Add funds to your Scryped wallet</div>
+
+          <div id="depositPathSelect">
+            <div class="deposit-path" id="pathTransfer">
+              <div class="deposit-path-title">&#128274; Transfer from wallet</div>
+              <div class="deposit-path-desc">Connect Phantom and send directly</div>
+            </div>
+            <div class="deposit-path" id="pathReceive">
+              <div class="deposit-path-title">&#128229; Receive funds</div>
+              <div class="deposit-path-desc">Copy our address and send from any wallet or exchange</div>
+            </div>
           </div>
-          <div class="deposit-status" id="depositStatus"></div>
+
+          <div id="depositTransferView" style="display:none">
+            <div class="deposit-amounts">
+              <button class="deposit-btn" data-usd="1">$1</button>
+              <button class="deposit-btn" data-usd="5">$5</button>
+              <button class="deposit-btn" data-usd="20">$20</button>
+            </div>
+            <div class="deposit-status" id="depositStatus"></div>
+          </div>
+
+          <div id="depositReceiveView" style="display:none">
+            <div class="house-address-box" style="display:block">
+              <div class="house-address-label">Send SOL to this address</div>
+              <div class="house-address-val" id="houseAddrDisplay">Loading...</div>
+              <button class="copy-btn" id="copyHouseAddr">Copy Address</button>
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.35);margin:12px 0">
+              After sending, click Refresh Balance on the main screen.<br/>
+              Deposits are verified on-chain and credited automatically.
+            </div>
+          </div>
+
           <button class="modal-close" id="depositClose">Cancel</button>
         </div>
       </div>

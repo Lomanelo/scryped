@@ -21,6 +21,7 @@ let gameStarted = false;
 let walletBalance = 0;
 let walletInfo = null;
 let entryFeeUsd = 1;
+let userWalletAddress = "";
 let qHoldStart = 0;
 let qHolding = false;
 const Q_HOLD_DURATION = 3000;
@@ -29,10 +30,8 @@ const startScreen = document.getElementById("startScreen");
 const nameInput = document.getElementById("nameInput");
 const joinBtn = document.getElementById("joinBtn");
 const hudEl = document.getElementById("hud");
-const connectWalletBtn = document.getElementById("connectWalletBtn");
-const walletAddrEl = document.getElementById("walletAddr");
+const walletInput = document.getElementById("walletInput");
 const walletBalEl = document.getElementById("walletBal");
-const walletConnectedActions = document.getElementById("walletConnectedActions");
 const depositBtn = document.getElementById("depositBtn");
 const depositModal = document.getElementById("depositModal");
 const depositStatus = document.getElementById("depositStatus");
@@ -42,6 +41,10 @@ const cashoutAmountEl = document.getElementById("cashoutAmount");
 const cashoutCanvas = document.getElementById("cashoutCanvas");
 const cashoutCtx = cashoutCanvas.getContext("2d");
 const cashoutResultModal = document.getElementById("cashoutResultModal");
+const houseAddrDisplay = document.getElementById("houseAddrDisplay");
+const pathSelect = document.getElementById("depositPathSelect");
+const transferView = document.getElementById("depositTransferView");
+const receiveView = document.getElementById("depositReceiveView");
 
 socketClient.connect();
 
@@ -49,6 +52,7 @@ socketClient.on("wallet:info", (data) => {
   walletInfo = data;
   entryFeeUsd = data.entryFeeUsd;
   if (data.rpcUrl) walletMgr.setRpc(data.rpcUrl);
+  if (data.houseWallet) houseAddrDisplay.textContent = data.houseWallet;
 });
 socketClient.requestWalletInfo();
 
@@ -64,7 +68,7 @@ socketClient.on("wallet:error", (data) => {
 
 socketClient.on("wallet:deposit_success", (data) => {
   depositStatus.textContent = `Deposited $${data.amount.toFixed(2)}!`;
-  setTimeout(() => { depositModal.style.display = "none"; depositStatus.textContent = ""; }, 2000);
+  setTimeout(() => { resetDepositModal(); }, 2000);
 });
 
 socketClient.on("game:started", () => {
@@ -90,40 +94,98 @@ document.getElementById("crClose").addEventListener("click", () => {
   startScreen.style.display = "";
 });
 
+function connectUserWallet(addr) {
+  userWalletAddress = addr.trim();
+  socketClient.connectWallet(userWalletAddress);
+  updateJoinBtn();
+}
+
+walletInput.addEventListener("change", () => {
+  const addr = walletInput.value.trim();
+  if (addr.length >= 32 && addr.length <= 44) {
+    connectUserWallet(addr);
+  }
+});
+walletInput.addEventListener("paste", () => {
+  setTimeout(() => {
+    const addr = walletInput.value.trim();
+    if (addr.length >= 32 && addr.length <= 44) {
+      connectUserWallet(addr);
+    }
+  }, 50);
+});
+
 function updateJoinBtn() {
-  if (walletMgr.isConnected() && walletBalance >= entryFeeUsd) {
+  if (userWalletAddress && walletBalance >= entryFeeUsd) {
     joinBtn.classList.remove("btn-disabled");
   } else {
     joinBtn.classList.add("btn-disabled");
   }
 }
 
-async function ensureWalletConnected() {
-  if (walletMgr.isConnected()) return true;
-  try {
-    const pubkey = await walletMgr.connect();
-    walletAddrEl.textContent = pubkey.slice(0, 4) + "..." + pubkey.slice(-4);
-    connectWalletBtn.style.display = "none";
-    walletConnectedActions.style.display = "flex";
-    socketClient.connectWallet(pubkey);
-    return true;
-  } catch (err) {
-    walletAddrEl.textContent = err.message;
-    return false;
+document.getElementById("refreshBalBtn").addEventListener("click", () => {
+  if (userWalletAddress) {
+    socketClient.connectWallet(userWalletAddress);
+    socketClient.checkDeposits(userWalletAddress);
   }
+});
+
+function resetDepositModal() {
+  depositModal.style.display = "none";
+  depositStatus.textContent = "";
+  pathSelect.style.display = "";
+  transferView.style.display = "none";
+  receiveView.style.display = "none";
 }
 
-connectWalletBtn.addEventListener("click", () => ensureWalletConnected());
-
-depositBtn.addEventListener("click", async () => {
-  if (await ensureWalletConnected()) depositModal.style.display = "flex";
+depositBtn.addEventListener("click", () => {
+  if (!userWalletAddress) {
+    walletInput.focus();
+    walletInput.style.borderColor = "#ff4444";
+    setTimeout(() => { walletInput.style.borderColor = ""; }, 1500);
+    return;
+  }
+  resetDepositModal();
+  depositModal.style.display = "flex";
+  pathSelect.style.display = "";
 });
-depositClose.addEventListener("click", () => { depositModal.style.display = "none"; depositStatus.textContent = ""; });
+depositClose.addEventListener("click", resetDepositModal);
+
+document.getElementById("pathTransfer").addEventListener("click", async () => {
+  pathSelect.style.display = "none";
+  transferView.style.display = "";
+  receiveView.style.display = "none";
+});
+
+document.getElementById("pathReceive").addEventListener("click", () => {
+  pathSelect.style.display = "none";
+  transferView.style.display = "none";
+  receiveView.style.display = "";
+});
+
+document.getElementById("copyHouseAddr").addEventListener("click", () => {
+  if (walletInfo?.houseWallet) {
+    navigator.clipboard.writeText(walletInfo.houseWallet);
+    document.getElementById("copyHouseAddr").textContent = "Copied!";
+    setTimeout(() => { document.getElementById("copyHouseAddr").textContent = "Copy Address"; }, 2000);
+  }
+});
 
 document.querySelectorAll(".deposit-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const usd = parseFloat(btn.dataset.usd);
-    if (!(await ensureWalletConnected()) || !walletInfo) return;
+    if (!walletInfo) return;
+
+    if (!walletMgr.isConnected()) {
+      try {
+        depositStatus.textContent = "Connecting wallet...";
+        await walletMgr.connect();
+      } catch (err) {
+        depositStatus.textContent = `Error: ${err.message}`;
+        return;
+      }
+    }
+
     const solAmount = usd / walletInfo.solPrice;
     depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
     try {
@@ -136,14 +198,14 @@ document.querySelectorAll(".deposit-btn").forEach((btn) => {
   });
 });
 
-document.getElementById("cashOutBtn")?.addEventListener("click", async () => {
+document.getElementById("cashOutBtn")?.addEventListener("click", () => {
   if (walletBalance > 0) {
     alert(`Your balance: $${walletBalance.toFixed(2)}\nWithdrawal to wallet coming soon.`);
   }
 });
 
-joinBtn.addEventListener("click", async () => {
-  if (!(await ensureWalletConnected()) || walletBalance < entryFeeUsd) return;
+joinBtn.addEventListener("click", () => {
+  if (!userWalletAddress || walletBalance < entryFeeUsd) return;
   const name = nameInput.value.trim() || "";
   socketClient.joinGame(name);
 });

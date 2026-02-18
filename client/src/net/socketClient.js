@@ -58,6 +58,7 @@ export function createSocketClient() {
     requestWalletInfo() { if (socket) socket.emit("wallet:get_info"); },
     connectWallet(walletAddress) { if (socket) socket.emit("wallet:connect", { walletAddress }); },
     verifyDeposit(signature, amountSol) { if (socket) socket.emit("wallet:deposit_verify", { signature, amountSol }); },
+    checkDeposits(walletAddress) { if (socket) socket.emit("wallet:check_deposits", { walletAddress }); },
     joinGame(name) { if (socket) socket.emit("wallet:join_game", { name }); },
     cashout() { if (socket) socket.emit("cashout"); }
   };

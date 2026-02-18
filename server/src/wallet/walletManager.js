@@ -64,6 +64,37 @@ export function calculateCashout(inGameBalance) {
   return { payout, fee, feePercent: HOUSE_FEE * 100 };
 }
 
+const processedSignatures = new Set();
+
+export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
+  const deposits = [];
+  try {
+    const senderPubkey = new PublicKey(senderAddress);
+    const sigs = await connection.getSignaturesForAddress(senderPubkey, { limit: 10 }, "confirmed");
+
+    for (const sigInfo of sigs) {
+      if (processedSignatures.has(sigInfo.signature)) continue;
+      if (sigInfo.err) continue;
+
+      try {
+        const tx = await connection.getTransaction(sigInfo.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
+        if (!tx || !tx.meta || tx.meta.err) continue;
+
+        const accounts = tx.transaction.message.staticAccountKeys || tx.transaction.message.accountKeys;
+        const houseIndex = accounts.findIndex((k) => k.toBase58() === houseWallet);
+        if (houseIndex === -1) continue;
+
+        const received = tx.meta.postBalances[houseIndex] - tx.meta.preBalances[houseIndex];
+        if (received > 0) {
+          processedSignatures.add(sigInfo.signature);
+          deposits.push({ signature: sigInfo.signature, lamports: received });
+        }
+      } catch {}
+    }
+  } catch {}
+  return deposits;
+}
+
 export async function verifyDeposit(connection, signature, expectedLamports, houseWallet) {
   try {
     const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
@@ -82,6 +113,7 @@ export async function verifyDeposit(connection, signature, expectedLamports, hou
       return { valid: false, reason: `Insufficient amount: got ${received}, expected ${expectedLamports}` };
     }
 
+    processedSignatures.add(signature);
     return { valid: true, lamports: received };
   } catch (err) {
     return { valid: false, reason: err.message };

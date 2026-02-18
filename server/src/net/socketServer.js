@@ -3,7 +3,7 @@ import { createInitialPlayer } from "../game/GameLoop.js";
 import {
   getPlayerBalance, creditPlayer, debitPlayer, calculateCashout,
   getEntryFeeUsd, getEntryFeeSol, getSolPrice, getHouseFee,
-  verifyDeposit
+  verifyDeposit, scanDepositsFrom
 } from "../wallet/walletManager.js";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -112,6 +112,30 @@ export function attachSocketServer(io, gameLoop, state, config) {
         socket.emit("wallet:deposit_success", { amount: usdAmount });
       } else {
         socket.emit("wallet:error", { message: result.reason });
+      }
+    });
+
+    socket.on("wallet:check_deposits", async (data) => {
+      const walletAddress = data?.walletAddress || socketWalletMap.get(socket.id);
+      if (!walletAddress) return;
+
+      const deposits = await scanDepositsFrom(connection, walletAddress, HOUSE_WALLET);
+      if (deposits.length > 0) {
+        const solPrice = await getSolPrice();
+        let totalUsd = 0;
+        for (const dep of deposits) {
+          const usd = (dep.lamports / LAMPORTS_PER_SOL) * solPrice;
+          creditPlayer(walletAddress, usd);
+          totalUsd += usd;
+        }
+        const bal = getPlayerBalance(walletAddress);
+        socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
+        if (totalUsd > 0) {
+          socket.emit("wallet:deposit_success", { amount: totalUsd });
+        }
+      } else {
+        const bal = getPlayerBalance(walletAddress);
+        socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
       }
     });
 
