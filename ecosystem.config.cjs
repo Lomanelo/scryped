@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "snapback",
+    name: "scryped",
     script: "server/src/index.js",
     instances: 1,
     autorestart: true,

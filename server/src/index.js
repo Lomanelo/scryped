@@ -47,5 +47,5 @@ server.on("error", (error) => {
 server.listen(port, "0.0.0.0", () => {
   gameLoop.start();
   // eslint-disable-next-line no-console
-  console.log(`Snapback.io server running at http://0.0.0.0:${port}`);
+  console.log(`Scryped server running at http://0.0.0.0:${port}`);
 });
