@@ -98,25 +98,32 @@ function updateJoinBtn() {
   }
 }
 
-connectWalletBtn.addEventListener("click", async () => {
+async function ensureWalletConnected() {
+  if (walletMgr.isConnected()) return true;
   try {
     const pubkey = await walletMgr.connect();
     walletAddrEl.textContent = pubkey.slice(0, 4) + "..." + pubkey.slice(-4);
     connectWalletBtn.style.display = "none";
     walletConnectedActions.style.display = "flex";
     socketClient.connectWallet(pubkey);
+    return true;
   } catch (err) {
     walletAddrEl.textContent = err.message;
+    return false;
   }
-});
+}
 
-depositBtn.addEventListener("click", () => { depositModal.style.display = "flex"; });
+connectWalletBtn.addEventListener("click", () => ensureWalletConnected());
+
+depositBtn.addEventListener("click", async () => {
+  if (await ensureWalletConnected()) depositModal.style.display = "flex";
+});
 depositClose.addEventListener("click", () => { depositModal.style.display = "none"; depositStatus.textContent = ""; });
 
 document.querySelectorAll(".deposit-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const usd = parseFloat(btn.dataset.usd);
-    if (!walletMgr.isConnected() || !walletInfo) return;
+    if (!(await ensureWalletConnected()) || !walletInfo) return;
     const solAmount = usd / walletInfo.solPrice;
     depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
     try {
@@ -129,14 +136,14 @@ document.querySelectorAll(".deposit-btn").forEach((btn) => {
   });
 });
 
-document.getElementById("cashOutBtn")?.addEventListener("click", () => {
+document.getElementById("cashOutBtn")?.addEventListener("click", async () => {
   if (walletBalance > 0) {
     alert(`Your balance: $${walletBalance.toFixed(2)}\nWithdrawal to wallet coming soon.`);
   }
 });
 
-joinBtn.addEventListener("click", () => {
-  if (!walletMgr.isConnected() || walletBalance < entryFeeUsd) return;
+joinBtn.addEventListener("click", async () => {
+  if (!(await ensureWalletConnected()) || walletBalance < entryFeeUsd) return;
   const name = nameInput.value.trim() || "";
   socketClient.joinGame(name);
 });
