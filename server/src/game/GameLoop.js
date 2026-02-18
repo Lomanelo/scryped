@@ -331,7 +331,7 @@ export class GameLoop {
           player.deadSince = Date.now();
           player.deaths = (player.deaths ?? 0) + 1;
 
-          const coinValue = (player.coins ?? 0) + 1;
+          const coinValue = player.coins ?? 1;
           this.state.coins.push({
             id: `coin:${player.id}:${Date.now()}`,
             x: player.x, y: player.y,
@@ -447,7 +447,7 @@ export function createInitialPlayer({ id, isBot = false }) {
     hp: 3, maxHp: 3, dead: false,
     hasSpear: true, lastShotAt: 0, lastDashAt: 0,
     facingAngle: 0, color: nextColor(),
-    kills: 0, deaths: 0, hitTime: 0, coins: 0, entryFee: 1,
+    kills: 0, deaths: 0, hitTime: 0, coins: 1, entryFee: 1,
     lastInput: { moveX: 0, moveY: 0, shoot: false, dash: false, facingAngle: 0 },
     lastInputAt: 0, aiWander: 0
   };
