@@ -302,13 +302,11 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyQ" && !e.repeat && gameStarted) {
     qHolding = true;
     qHoldStart = Date.now();
-    cashoutOverlay.style.display = "block";
   }
 });
 window.addEventListener("keyup", (e) => {
   if (e.code === "KeyQ") {
     qHolding = false;
-    cashoutOverlay.style.display = "none";
   }
 });
 
@@ -973,34 +971,54 @@ function tick() {
   drawKillFeed(dt);
   drawMinimap();
 
-  if (qHolding && gameStarted) {
+  if (qHolding && gameStarted && !localDead) {
     const elapsed = Date.now() - qHoldStart;
     const progress = Math.min(1, elapsed / Q_HOLD_DURATION);
     const mePlayer = snapshot?.players?.find((pl) => pl.id === socketClient.getPlayerId());
     const totalCoins = mePlayer?.coins ?? localCoins;
     const inGameBal = (mePlayer?.entryFee ?? entryFeeUsd) + totalCoins;
     const payout = inGameBal * (1 - 0.15);
-    cashoutAmountEl.textContent = `$${payout.toFixed(2)}`;
 
-    cashoutCtx.clearRect(0, 0, 128, 128);
-    cashoutCtx.beginPath();
-    cashoutCtx.arc(64, 64, 28, 0, Math.PI * 2);
-    cashoutCtx.fillStyle = "rgba(0,0,0,0.5)";
-    cashoutCtx.fill();
-    cashoutCtx.beginPath();
-    cashoutCtx.arc(64, 64, 28, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress);
-    cashoutCtx.strokeStyle = "#ffd700";
-    cashoutCtx.lineWidth = 5;
-    cashoutCtx.stroke();
-    cashoutCtx.fillStyle = "#fff";
-    cashoutCtx.font = "bold 16px Arial";
-    cashoutCtx.textAlign = "center";
-    cashoutCtx.textBaseline = "middle";
-    cashoutCtx.fillText("Q", 64, 64);
+    const ringR = r + 8;
+    const ringWidth = Math.max(4, r * 0.12);
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = "#ffd700";
+    ctx.lineWidth = ringWidth;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#ffd700";
+    ctx.lineWidth = ringWidth;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ringR, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress);
+    ctx.stroke();
+
+    ctx.shadowColor = "#ffd700";
+    ctx.shadowBlur = 12;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ringR, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.globalAlpha = 0.85;
+    const labelY = p.y + r + 28;
+    ctx.font = "bold 13px Inter, Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffd700";
+    ctx.fillText(`Cash out $${payout.toFixed(2)}`, p.x, labelY);
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
 
     if (progress >= 1) {
       qHolding = false;
-      cashoutOverlay.style.display = "none";
       socketClient.cashout();
     }
   }

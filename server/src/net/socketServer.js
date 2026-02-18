@@ -7,7 +7,7 @@ import {
 } from "../wallet/walletManager.js";
 import {
   isFirebaseEnabled, verifyToken, getOrCreateUser,
-  setUserWallet, getUserBalance
+  setUserWallet, getUserBalance, recordHouseFee
 } from "../auth/firebaseAdmin.js";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -294,6 +294,7 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const { payout, fee } = calculateCashout(inGameBalance);
 
       await creditPayout(uid, payout);
+      await recordHouseFee(fee, uid);
 
       state.players.delete(socket.id);
       state.spears = state.spears.filter((s) => s.ownerId !== socket.id);

@@ -96,4 +96,18 @@ export async function creditUserPayout(uid, amountUsd) {
   });
 }
 
+export async function recordHouseFee(feeUsd, playerUid) {
+  if (!db) return;
+  await db.collection("house_earnings").add({
+    amount: feeUsd,
+    playerUid,
+    timestamp: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const houseRef = db.collection("meta").doc("house");
+  await houseRef.set(
+    { totalEarnings: admin.firestore.FieldValue.increment(feeUsd) },
+    { merge: true }
+  );
+}
+
 export { admin, db };
