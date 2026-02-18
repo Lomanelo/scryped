@@ -41,12 +41,12 @@ export async function createUser(uid, data) {
     email: data.email || "",
     displayName: data.displayName || "",
     walletAddress: data.walletAddress || "",
-    balance: 0,
-    deposited: 0,
+    balanceSol: 0,
+    depositedSol: 0,
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
   await db.collection("users").doc(uid).set(userData);
-  return { uid, ...userData, balance: 0, deposited: 0 };
+  return { uid, ...userData, balanceSol: 0, depositedSol: 0 };
 }
 
 export async function getOrCreateUser(uid, data) {
@@ -59,27 +59,27 @@ export async function getOrCreateUser(uid, data) {
 
 export async function getUserBalance(uid) {
   const user = await getUser(uid);
-  if (!user) return { balance: 0, deposited: 0, walletAddress: "" };
-  return { balance: user.balance || 0, deposited: user.deposited || 0, walletAddress: user.walletAddress || "" };
+  if (!user) return { balanceSol: 0, depositedSol: 0, walletAddress: "" };
+  return { balanceSol: user.balanceSol || 0, depositedSol: user.depositedSol || 0, walletAddress: user.walletAddress || "" };
 }
 
-export async function creditUserBalance(uid, amountUsd) {
+export async function creditUserSol(uid, amountSol) {
   if (!db) return;
   await db.collection("users").doc(uid).update({
-    balance: admin.firestore.FieldValue.increment(amountUsd),
-    deposited: admin.firestore.FieldValue.increment(amountUsd)
+    balanceSol: admin.firestore.FieldValue.increment(amountSol),
+    depositedSol: admin.firestore.FieldValue.increment(amountSol)
   });
 }
 
-export async function debitUserBalance(uid, amountUsd) {
+export async function debitUserSol(uid, amountSol) {
   if (!db) return false;
   const ref = db.collection("users").doc(uid);
   return db.runTransaction(async (t) => {
     const doc = await t.get(ref);
     if (!doc.exists) return false;
-    const current = doc.data().balance || 0;
-    if (current < amountUsd) return false;
-    t.update(ref, { balance: current - amountUsd });
+    const current = doc.data().balanceSol || 0;
+    if (current < amountSol - 0.000001) return false;
+    t.update(ref, { balanceSol: current - amountSol });
     return true;
   });
 }
@@ -89,10 +89,10 @@ export async function setUserWallet(uid, walletAddress) {
   await db.collection("users").doc(uid).update({ walletAddress });
 }
 
-export async function creditUserPayout(uid, amountUsd) {
+export async function creditUserPayoutSol(uid, amountSol) {
   if (!db) return;
   await db.collection("users").doc(uid).update({
-    balance: admin.firestore.FieldValue.increment(amountUsd)
+    balanceSol: admin.firestore.FieldValue.increment(amountSol)
   });
 }
 
@@ -108,6 +108,26 @@ export async function recordHouseFee(feeUsd, playerUid) {
     { totalEarnings: admin.firestore.FieldValue.increment(feeUsd) },
     { merge: true }
   );
+}
+
+export async function isSignatureProcessed(signature) {
+  if (!db) return false;
+  const doc = await db.collection("processed_signatures").doc(signature).get();
+  return doc.exists;
+}
+
+export async function markSignatureProcessed(signature, uid, lamports) {
+  if (!db) return;
+  await db.collection("processed_signatures").doc(signature).set({
+    uid,
+    lamports,
+    processedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+export async function setUserBalance(uid, amountSol) {
+  if (!db) return;
+  await db.collection("users").doc(uid).update({ balanceSol: amountSol });
 }
 
 export { admin, db };

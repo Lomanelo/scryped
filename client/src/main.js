@@ -19,14 +19,17 @@ const ctx = canvas.getContext("2d");
 const controls = createControls(canvas);
 
 let gameStarted = false;
-let walletBalance = 0;
+let balanceSol = 0;
+let solPrice = 0;
 let walletInfo = null;
 let entryFeeUsd = 1;
+let entryFeeSol = 0;
 let userWalletAddress = "";
 let isAuthenticated = false;
 let qHoldStart = 0;
 let qHolding = false;
 const Q_HOLD_DURATION = 3000;
+const walletBalUsd = document.getElementById("walletBalUsd");
 
 const startScreen = document.getElementById("startScreen");
 const nameInput = document.getElementById("nameInput");
@@ -71,6 +74,13 @@ socketClient.on("auth:config", async (data) => {
 });
 socketClient.requestAuthConfig();
 
+function updateBalanceDisplay() {
+  walletBalEl.textContent = `${balanceSol.toFixed(4)} SOL`;
+  const usdVal = balanceSol * solPrice;
+  walletBalUsd.textContent = solPrice > 0 ? `\u2248 $${usdVal.toFixed(2)}` : "";
+  updateJoinBtn();
+}
+
 socketClient.on("auth:success", (data) => {
   isAuthenticated = true;
   authSignedOut.style.display = "none";
@@ -78,13 +88,13 @@ socketClient.on("auth:success", (data) => {
   authName.textContent = data.displayName || data.email;
   authEmail.textContent = data.email;
   authAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || data.email)}&background=1a2540&color=ffd700&size=64`;
-  walletBalance = data.balance || 0;
-  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
+  balanceSol = data.balanceSol || 0;
+  if (data.solPrice) solPrice = data.solPrice;
   if (data.walletAddress) {
     userWalletAddress = data.walletAddress;
     walletInput.value = data.walletAddress;
   }
-  updateJoinBtn();
+  updateBalanceDisplay();
 });
 
 socketClient.on("auth:error", (data) => {
@@ -113,8 +123,10 @@ signOutBtn.addEventListener("click", async () => {
   await signOut();
   isAuthenticated = false;
   userWalletAddress = "";
-  walletBalance = 0;
-  walletBalEl.textContent = "$0.00";
+  balanceSol = 0;
+  solPrice = 0;
+  walletBalEl.textContent = "0.0000 SOL";
+  walletBalUsd.textContent = "";
   walletInput.value = "";
   authSignedOut.style.display = "";
   authSignedIn.style.display = "none";
@@ -125,15 +137,20 @@ signOutBtn.addEventListener("click", async () => {
 socketClient.on("wallet:info", (data) => {
   walletInfo = data;
   entryFeeUsd = data.entryFeeUsd;
+  entryFeeSol = data.entryFeeSol;
+  if (data.solPrice) solPrice = data.solPrice;
   if (data.rpcUrl) walletMgr.setRpc(data.rpcUrl);
   if (data.houseWallet) houseAddrDisplay.textContent = data.houseWallet;
+  document.getElementById("entryFeeBadge").textContent = `~${entryFeeSol.toFixed(4)} SOL`;
+  document.getElementById("entryInfo").textContent = `Entry: ~${entryFeeSol.toFixed(4)} SOL ($${entryFeeUsd.toFixed(2)}) \u00b7 15% fee on cash out`;
+  updateBalanceDisplay();
 });
 socketClient.requestWalletInfo();
 
 socketClient.on("wallet:balance", (data) => {
-  walletBalance = data.balance;
-  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
-  updateJoinBtn();
+  balanceSol = data.balanceSol;
+  if (data.solPrice) solPrice = data.solPrice;
+  updateBalanceDisplay();
 });
 
 socketClient.on("wallet:error", (data) => {
@@ -141,7 +158,7 @@ socketClient.on("wallet:error", (data) => {
 });
 
 socketClient.on("wallet:deposit_success", (data) => {
-  depositStatus.textContent = `Deposited $${data.amount.toFixed(2)}!`;
+  depositStatus.textContent = `Deposited ${data.amountSol?.toFixed(4) || "?"} SOL (~$${data.amountUsd?.toFixed(2) || "?"})!`;
   setTimeout(() => { resetDepositModal(); }, 2000);
 });
 
@@ -153,14 +170,14 @@ socketClient.on("game:started", () => {
 
 socketClient.on("cashout:success", (data) => {
   gameStarted = false;
-  walletBalance = data.walletBalance;
-  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
-  document.getElementById("crGross").textContent = `$${data.grossAmount.toFixed(2)}`;
-  document.getElementById("crFee").textContent = `-$${data.fee.toFixed(2)}`;
-  document.getElementById("crNet").textContent = `$${data.netPayout.toFixed(2)}`;
+  balanceSol = data.balanceSol;
+  if (data.solPrice) solPrice = data.solPrice;
+  updateBalanceDisplay();
+  document.getElementById("crGross").textContent = `${data.grossCoins} coin${data.grossCoins !== 1 ? "s" : ""}`;
+  document.getElementById("crFee").textContent = `-${data.feeSol.toFixed(4)} SOL`;
+  document.getElementById("crNet").textContent = `${data.payoutSol.toFixed(4)} SOL (~$${data.payoutUsd.toFixed(2)})`;
   cashoutResultModal.style.display = "flex";
   cashoutOverlay.style.display = "none";
-  updateJoinBtn();
 });
 
 socketClient.on("eliminated", () => {
@@ -201,7 +218,9 @@ walletInput.addEventListener("paste", () => {
 });
 
 function updateJoinBtn() {
-  if (isAuthenticated && walletBalance >= entryFeeUsd) {
+  const hasName = nameInput.value.trim().length > 0;
+  const hasEnough = entryFeeSol > 0 ? balanceSol >= entryFeeSol - 0.000001 : balanceSol * solPrice >= entryFeeUsd;
+  if (isAuthenticated && hasEnough && hasName) {
     joinBtn.classList.remove("btn-disabled");
   } else {
     joinBtn.classList.add("btn-disabled");
@@ -210,8 +229,8 @@ function updateJoinBtn() {
 
 document.getElementById("refreshBalBtn").addEventListener("click", () => {
   if (isAuthenticated) {
+    socketClient.refreshBalance();
     if (userWalletAddress) {
-      socketClient.connectWallet(userWalletAddress);
       socketClient.checkDeposits(userWalletAddress);
     }
   }
@@ -290,13 +309,16 @@ document.getElementById("cashOutBtn")?.addEventListener("click", () => {
 });
 
 joinBtn.addEventListener("click", () => {
-  if (!isAuthenticated || walletBalance < entryFeeUsd) return;
-  const name = nameInput.value.trim() || "";
+  const name = nameInput.value.trim();
+  if (!isAuthenticated || !name) return;
+  const hasEnough = entryFeeSol > 0 ? balanceSol >= entryFeeSol - 0.000001 : balanceSol * solPrice >= entryFeeUsd;
+  if (!hasEnough) return;
   socketClient.joinGame(name);
 });
 nameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") joinBtn.click();
 });
+nameInput.addEventListener("input", updateJoinBtn);
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyQ" && !e.repeat && gameStarted) {
@@ -976,8 +998,7 @@ function tick() {
     const progress = Math.min(1, elapsed / Q_HOLD_DURATION);
     const mePlayer = snapshot?.players?.find((pl) => pl.id === socketClient.getPlayerId());
     const totalCoins = mePlayer?.coins ?? localCoins;
-    const inGameBal = (mePlayer?.entryFee ?? entryFeeUsd) + totalCoins;
-    const payout = inGameBal * (1 - 0.15);
+    const payout = totalCoins * (1 - 0.15);
 
     const ringR = r + 8;
     const ringWidth = Math.max(4, r * 0.12);
@@ -1026,10 +1047,9 @@ function tick() {
   if (snapshot) {
     const mePlayer = snapshot.players.find((pl) => pl.id === socketClient.getPlayerId());
     const totalCoins = mePlayer?.coins ?? localCoins;
-    const inGameBal = (mePlayer?.entryFee ?? entryFeeUsd) + totalCoins;
     hud.update(snapshot, {
       x: renderX, y: renderY, mass: 80, radius: localRadius, name: localName,
-      kills: localKills, deaths: localDeaths, coins: localCoins, inGameBalance: inGameBal
+      kills: localKills, deaths: localDeaths, coins: localCoins, inGameBalance: totalCoins
     });
   }
 }

@@ -97,7 +97,10 @@
       .wallet-input::placeholder { color: rgba(255,255,255,0.2); font-family: inherit; }
       .wallet-label { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
       .wallet-balance {
-        font-size: 36px; font-weight: 900; color: #fff; margin-bottom: 4px;
+        font-size: 32px; font-weight: 900; color: #fff; margin-bottom: 2px;
+      }
+      .wallet-balance-usd {
+        font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.45); margin-bottom: 4px;
       }
       .wallet-balance-sub { font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 16px; }
       .wallet-actions { display: flex; gap: 8px; }
@@ -286,7 +289,8 @@
               </div>
             </div>
 
-            <div class="wallet-balance" id="walletBal">$0.00</div>
+            <div class="wallet-balance" id="walletBal">0.0000 SOL</div>
+            <div class="wallet-balance-usd" id="walletBalUsd">&#8776; $0.00</div>
             <div class="wallet-balance-sub">Account Balance <button class="refresh-bal-btn" id="refreshBalBtn">Refresh</button></div>
 
             <div class="wallet-label">Solana address (for deposits)</div>
@@ -300,12 +304,12 @@
 
           <div class="card play-card">
             <div class="card-title"><span class="icon">&#127918;</span> Play</div>
-            <input id="nameInput" type="text" placeholder="Set Username" maxlength="16" autocomplete="off" />
+            <input id="nameInput" type="text" placeholder="Enter Username *" maxlength="16" autocomplete="off" required />
             <div class="entry-fee-row">
-              <div class="fee-badge active">$1</div>
+              <div class="fee-badge active" id="entryFeeBadge">$1</div>
             </div>
             <button class="btn btn-green btn-disabled" id="joinBtn">&#9654; JOIN GAME</button>
-            <div class="entry-info">Entry: $1.00 &middot; 15% fee on cash out</div>
+            <div class="entry-info" id="entryInfo">Entry: ~$1.00 &middot; 15% fee on cash out</div>
           </div>
         </div>
 

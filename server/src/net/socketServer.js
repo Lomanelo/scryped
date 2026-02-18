@@ -1,13 +1,13 @@
 import { EVENTS } from "../../../shared/protocol/messages.js";
 import { createInitialPlayer } from "../game/GameLoop.js";
 import {
-  getPlayerBalance, creditPlayer, debitPlayer, creditPayout, calculateCashout,
+  getPlayerBalance, creditPlayerSol, debitPlayerSol, creditPayoutSol, calculateCashout,
   getEntryFeeUsd, getEntryFeeSol, getSolPrice, getHouseFee,
   verifyDeposit, scanDepositsFrom
 } from "../wallet/walletManager.js";
 import {
   isFirebaseEnabled, verifyToken, getOrCreateUser,
-  setUserWallet, getUserBalance, recordHouseFee
+  setUserWallet, getUserBalance, recordHouseFee, setUserBalance
 } from "../auth/firebaseAdmin.js";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -114,13 +114,15 @@ export function attachSocketServer(io, gameLoop, state, config) {
           walletAddress: user.walletAddress || ""
         });
 
-        const bal = await getUserBalance(uid);
+        const bal = await getPlayerBalance(uid);
+        const solPrice = await getSolPrice();
         socket.emit("auth:success", {
           uid,
           email: user.email,
           displayName: user.displayName,
           walletAddress: user.walletAddress || "",
-          balance: bal.balance
+          balanceSol: bal.balanceSol,
+          solPrice
         });
       } catch (err) {
         console.error("[auth] Login failed:", err.message);
@@ -160,6 +162,28 @@ export function attachSocketServer(io, gameLoop, state, config) {
       });
     });
 
+    socket.on("wallet:refresh_balance", async () => {
+      const user = getSocketUser(socket.id);
+      if (!user?.uid) return;
+      const bal = await getPlayerBalance(user.uid);
+      const solPrice = await getSolPrice();
+      socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress: user.walletAddress });
+    });
+
+    socket.on("admin:reset_balance", async (data) => {
+      const adminSecret = process.env.ADMIN_SECRET;
+      if (!adminSecret || data?.secret !== adminSecret) return;
+      const user = getSocketUser(socket.id);
+      if (!user?.uid) return;
+      const amount = parseFloat(data?.amount ?? 0);
+      if (isNaN(amount) || amount < 0) return;
+      await setUserBalance(user.uid, amount);
+      const bal = await getPlayerBalance(user.uid);
+      const solPrice = await getSolPrice();
+      socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress: user.walletAddress });
+      console.log(`[admin] Reset balance for ${user.uid} to ${amount} SOL`);
+    });
+
     socket.on("wallet:connect", async (data) => {
       const walletAddress = data?.walletAddress;
       if (!walletAddress) return socket.emit("wallet:error", { message: "No wallet address" });
@@ -168,7 +192,8 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const uid = user?.uid || walletAddress;
 
       const bal = await getPlayerBalance(uid);
-      socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
+      const solPrice = await getSolPrice();
+      socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress });
     });
 
     socket.on("wallet:deposit_verify", async (data) => {
@@ -180,15 +205,15 @@ export function attachSocketServer(io, gameLoop, state, config) {
       if (!signature) return socket.emit("wallet:error", { message: "No signature" });
 
       const expectedLamports = Math.floor((amountSol || 0) * LAMPORTS_PER_SOL);
-      const result = await verifyDeposit(connection, signature, expectedLamports, HOUSE_WALLET);
+      const result = await verifyDeposit(connection, signature, expectedLamports, HOUSE_WALLET, uid);
 
       if (result.valid) {
-        const solPrice = await getSolPrice();
-        const usdAmount = (result.lamports / LAMPORTS_PER_SOL) * solPrice;
-        await creditPlayer(uid, usdAmount);
+        const depositedSol = result.lamports / LAMPORTS_PER_SOL;
+        await creditPlayerSol(uid, depositedSol);
         const bal = await getPlayerBalance(uid);
-        socket.emit("wallet:balance", { balance: bal.balance, walletAddress: user.walletAddress });
-        socket.emit("wallet:deposit_success", { amount: usdAmount });
+        const solPrice = await getSolPrice();
+        socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress: user.walletAddress });
+        socket.emit("wallet:deposit_success", { amountSol: depositedSol, amountUsd: depositedSol * solPrice });
       } else {
         socket.emit("wallet:error", { message: result.reason });
       }
@@ -200,23 +225,24 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const walletAddress = data?.walletAddress || user?.walletAddress;
       if (!walletAddress || !uid) return;
 
-      const deposits = await scanDepositsFrom(connection, walletAddress, HOUSE_WALLET);
+      const deposits = await scanDepositsFrom(connection, walletAddress, HOUSE_WALLET, uid);
       if (deposits.length > 0) {
-        const solPrice = await getSolPrice();
-        let totalUsd = 0;
+        let totalSol = 0;
         for (const dep of deposits) {
-          const usd = (dep.lamports / LAMPORTS_PER_SOL) * solPrice;
-          await creditPlayer(uid, usd);
-          totalUsd += usd;
+          const sol = dep.lamports / LAMPORTS_PER_SOL;
+          await creditPlayerSol(uid, sol);
+          totalSol += sol;
         }
         const bal = await getPlayerBalance(uid);
-        socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
-        if (totalUsd > 0) {
-          socket.emit("wallet:deposit_success", { amount: totalUsd });
+        const solPrice = await getSolPrice();
+        socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress });
+        if (totalSol > 0) {
+          socket.emit("wallet:deposit_success", { amountSol: totalSol, amountUsd: totalSol * solPrice });
         }
       } else {
         const bal = await getPlayerBalance(uid);
-        socket.emit("wallet:balance", { balance: bal.balance, walletAddress });
+        const solPrice = await getSolPrice();
+        socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress });
       }
     });
 
@@ -225,11 +251,12 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const uid = user?.uid;
       if (!uid) return socket.emit("wallet:error", { message: "Sign in first" });
 
-      const entryFee = getEntryFeeUsd();
+      const entryFeeSol = await getEntryFeeSol();
+      const solPrice = await getSolPrice();
       const bal = await getPlayerBalance(uid);
 
-      if (bal.balance < entryFee) {
-        return socket.emit("wallet:error", { message: `Insufficient balance. Need $${entryFee.toFixed(2)}` });
+      if (bal.balanceSol < entryFeeSol - 0.000001) {
+        return socket.emit("wallet:error", { message: `Insufficient balance. Need ~${entryFeeSol.toFixed(4)} SOL ($${(entryFeeSol * solPrice).toFixed(2)})` });
       }
 
       if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
@@ -237,7 +264,7 @@ export function attachSocketServer(io, gameLoop, state, config) {
         return;
       }
 
-      const debited = await debitPlayer(uid, entryFee);
+      const debited = await debitPlayerSol(uid, entryFeeSol);
       if (!debited) {
         return socket.emit("wallet:error", { message: "Failed to debit entry fee" });
       }
@@ -253,12 +280,12 @@ export function attachSocketServer(io, gameLoop, state, config) {
       player.x = pos.x; player.y = pos.y;
       player.uid = uid;
       player.walletAddress = user.walletAddress;
-      player.entryFee = entryFee;
-      player.inGameBalance = entryFee;
+      player.entryFeeSol = entryFeeSol;
+      player.entryFee = 1;
       state.players.set(socket.id, player);
 
       const newBal = await getPlayerBalance(uid);
-      socket.emit("wallet:balance", { balance: newBal.balance, walletAddress: user.walletAddress });
+      socket.emit("wallet:balance", { balanceSol: newBal.balanceSol, solPrice, walletAddress: user.walletAddress });
 
       socket.emit(EVENTS.CONNECTED, {
         playerId: socket.id,
@@ -289,22 +316,26 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const uid = user?.uid;
       if (!uid) return;
 
-      const coins = player.coins ?? 0;
-      const inGameBalance = player.entryFee + coins;
-      const { payout, fee } = calculateCashout(inGameBalance);
+      const coins = player.coins ?? 1;
+      const entryFeeSol = player.entryFeeSol || 0;
+      const payoutSol = entryFeeSol * coins * (1 - getHouseFee());
+      const feeSol = entryFeeSol * coins * getHouseFee();
 
-      await creditPayout(uid, payout);
-      await recordHouseFee(fee, uid);
+      await creditPayoutSol(uid, payoutSol);
+      await recordHouseFee(feeSol, uid);
 
       state.players.delete(socket.id);
       state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
 
       const bal = await getPlayerBalance(uid);
+      const solPrice = await getSolPrice();
       socket.emit("cashout:success", {
-        grossAmount: inGameBalance,
-        fee,
-        netPayout: payout,
-        walletBalance: bal.balance
+        grossCoins: coins,
+        payoutSol,
+        feeSol,
+        payoutUsd: payoutSol * solPrice,
+        balanceSol: bal.balanceSol,
+        solPrice
       });
 
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });

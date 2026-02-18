@@ -1,7 +1,8 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
-  isFirebaseEnabled, getUserBalance, creditUserBalance,
-  debitUserBalance, creditUserPayout
+  isFirebaseEnabled, getUserBalance, creditUserSol,
+  debitUserSol, creditUserPayoutSol,
+  isSignatureProcessed, markSignatureProcessed
 } from "../auth/firebaseAdmin.js";
 
 const HOUSE_FEE = 0.15;
@@ -40,40 +41,40 @@ export async function getEntryFeeSol() {
 export async function getPlayerBalance(uid) {
   if (isFirebaseEnabled() && uid) {
     const data = await getUserBalance(uid);
-    return { balance: data.balance, deposited: data.deposited, walletAddress: data.walletAddress };
+    return { balanceSol: data.balanceSol, depositedSol: data.depositedSol, walletAddress: data.walletAddress };
   }
-  return memBalances.get(uid) || { deposited: 0, balance: 0, walletAddress: "" };
+  return memBalances.get(uid) || { depositedSol: 0, balanceSol: 0, walletAddress: "" };
 }
 
-export async function creditPlayer(uid, amountUsd) {
+export async function creditPlayerSol(uid, amountSol) {
   if (isFirebaseEnabled() && uid) {
-    await creditUserBalance(uid, amountUsd);
+    await creditUserSol(uid, amountSol);
     return;
   }
-  const existing = memBalances.get(uid) || { deposited: 0, balance: 0, walletAddress: "" };
-  existing.balance += amountUsd;
-  existing.deposited += amountUsd;
+  const existing = memBalances.get(uid) || { depositedSol: 0, balanceSol: 0, walletAddress: "" };
+  existing.balanceSol += amountSol;
+  existing.depositedSol += amountSol;
   memBalances.set(uid, existing);
 }
 
-export async function debitPlayer(uid, amountUsd) {
+export async function debitPlayerSol(uid, amountSol) {
   if (isFirebaseEnabled() && uid) {
-    return debitUserBalance(uid, amountUsd);
+    return debitUserSol(uid, amountSol);
   }
-  const existing = memBalances.get(uid) || { deposited: 0, balance: 0, walletAddress: "" };
-  if (existing.balance < amountUsd) return false;
-  existing.balance -= amountUsd;
+  const existing = memBalances.get(uid) || { depositedSol: 0, balanceSol: 0, walletAddress: "" };
+  if (existing.balanceSol < amountSol - 0.000001) return false;
+  existing.balanceSol -= amountSol;
   memBalances.set(uid, existing);
   return true;
 }
 
-export async function creditPayout(uid, amountUsd) {
+export async function creditPayoutSol(uid, amountSol) {
   if (isFirebaseEnabled() && uid) {
-    await creditUserPayout(uid, amountUsd);
+    await creditUserPayoutSol(uid, amountSol);
     return;
   }
-  const existing = memBalances.get(uid) || { deposited: 0, balance: 0, walletAddress: "" };
-  existing.balance += amountUsd;
+  const existing = memBalances.get(uid) || { depositedSol: 0, balanceSol: 0, walletAddress: "" };
+  existing.balanceSol += amountSol;
   memBalances.set(uid, existing);
 }
 
@@ -83,7 +84,23 @@ export function calculateCashout(inGameBalance) {
   return { payout, fee, feePercent: HOUSE_FEE * 100 };
 }
 
-const processedSignatures = new Set();
+const memProcessed = new Set();
+
+async function isProcessed(sig) {
+  if (memProcessed.has(sig)) return true;
+  if (isFirebaseEnabled()) {
+    const exists = await isSignatureProcessed(sig);
+    if (exists) { memProcessed.add(sig); return true; }
+  }
+  return false;
+}
+
+async function markProcessed(sig, uid, lamports) {
+  memProcessed.add(sig);
+  if (isFirebaseEnabled()) {
+    await markSignatureProcessed(sig, uid || "", lamports || 0);
+  }
+}
 
 function resolveKey(k) {
   if (typeof k === "string") return k;
@@ -136,14 +153,14 @@ function findHouseDeposit(tx, houseWallet) {
   return 0;
 }
 
-export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
+export async function scanDepositsFrom(connection, senderAddress, houseWallet, uid) {
   const deposits = [];
   try {
     const senderPubkey = new PublicKey(senderAddress);
     const sigs = await connection.getSignaturesForAddress(senderPubkey, { limit: 10 }, "confirmed");
 
     for (const sigInfo of sigs) {
-      if (processedSignatures.has(sigInfo.signature)) continue;
+      if (await isProcessed(sigInfo.signature)) continue;
       if (sigInfo.err) continue;
 
       try {
@@ -152,7 +169,7 @@ export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
 
         const received = findHouseDeposit(tx, houseWallet);
         if (received > 0) {
-          processedSignatures.add(sigInfo.signature);
+          await markProcessed(sigInfo.signature, uid, received);
           deposits.push({ signature: sigInfo.signature, lamports: received });
         }
       } catch {}
@@ -163,7 +180,11 @@ export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function verifyDeposit(connection, signature, expectedLamports, houseWallet) {
+export async function verifyDeposit(connection, signature, expectedLamports, houseWallet, uid) {
+  if (await isProcessed(signature)) {
+    return { valid: false, reason: "This transaction was already credited." };
+  }
+
   const MAX_RETRIES = 8;
   const RETRY_DELAY_MS = 3000;
 
@@ -195,7 +216,7 @@ export async function verifyDeposit(connection, signature, expectedLamports, hou
         return { valid: false, reason: `Amount too low: received ${(received / LAMPORTS_PER_SOL).toFixed(6)} SOL, expected ~${(expectedLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL` };
       }
 
-      processedSignatures.add(signature);
+      await markProcessed(signature, uid, received);
       return { valid: true, lamports: received };
     } catch (err) {
       if (attempt < MAX_RETRIES - 1) { await sleep(RETRY_DELAY_MS); continue; }
