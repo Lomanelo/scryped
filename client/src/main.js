@@ -163,6 +163,14 @@ socketClient.on("cashout:success", (data) => {
   updateJoinBtn();
 });
 
+socketClient.on("eliminated", () => {
+  gameStarted = false;
+  cashoutOverlay.style.display = "none";
+  qHolding = false;
+  startScreen.style.display = "";
+  updateJoinBtn();
+});
+
 document.getElementById("crClose").addEventListener("click", () => {
   cashoutResultModal.style.display = "none";
   startScreen.style.display = "";
@@ -294,7 +302,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyQ" && !e.repeat && gameStarted) {
     qHolding = true;
     qHoldStart = Date.now();
-    cashoutOverlay.style.display = "";
+    cashoutOverlay.style.display = "block";
   }
 });
 window.addEventListener("keyup", (e) => {
@@ -943,10 +951,10 @@ function tick() {
     }
 
     drawDashCooldownIndicator(p.x, p.y, r);
-  } else {
-    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "bold 22px Inter, Arial";
+  } else if (localDead) {
+    ctx.fillStyle = "rgba(255,60,60,0.8)"; ctx.font = "bold 26px Inter, Arial";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("Respawning...", p.x, p.y);
+    ctx.fillText("ELIMINATED", p.x, p.y);
   }
 
   drawBoomerangTrails(renderX, renderY, currentZoom, dt);

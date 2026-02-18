@@ -39,6 +39,7 @@ export function createSocketClient() {
     socket.on("wallet:error", (data) => emit("wallet:error", data));
     socket.on("wallet:deposit_success", (data) => emit("wallet:deposit_success", data));
     socket.on("cashout:success", (data) => emit("cashout:success", data));
+    socket.on("eliminated", (data) => emit("eliminated", data));
     socket.on("arena:full", () => emit("arena:full", {}));
     socket.on("auth:config", (data) => emit("auth:config", data));
     socket.on("auth:success", (data) => emit("auth:success", data));

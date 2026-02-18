@@ -257,9 +257,6 @@ export function attachSocketServer(io, gameLoop, state, config) {
       player.inGameBalance = entryFee;
       state.players.set(socket.id, player);
 
-      ensureDummy(state, player);
-      syncBots(state, config);
-
       const newBal = await getPlayerBalance(uid);
       socket.emit("wallet:balance", { balance: newBal.balance, walletAddress: user.walletAddress });
 
@@ -283,12 +280,6 @@ export function attachSocketServer(io, gameLoop, state, config) {
       const now = Date.now();
       if (isRateLimited(player, now, config)) return;
       gameLoop.ingestInput(player, payload ?? {});
-    });
-
-    socket.on("dummy_input", (payload) => {
-      const dummy = state.players.get(DUMMY_ID);
-      if (!dummy) return;
-      gameLoop.ingestInput(dummy, payload ?? {});
     });
 
     socket.on("cashout", async () => {
@@ -315,15 +306,6 @@ export function attachSocketServer(io, gameLoop, state, config) {
         walletBalance: bal.balance
       });
 
-      if (countHumanPlayers(state) === 0) {
-        removeDummy(state);
-        for (const p of state.players.values()) {
-          if (p.isBot) state.players.delete(p.id);
-        }
-        state.spears = [];
-        state.coins = [];
-      }
-      syncBots(state, config);
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });
     });
 
@@ -331,15 +313,6 @@ export function attachSocketServer(io, gameLoop, state, config) {
       state.players.delete(socket.id);
       state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
       socketUserMap.delete(socket.id);
-      if (countHumanPlayers(state) === 0) {
-        removeDummy(state);
-        for (const p of state.players.values()) {
-          if (p.isBot) state.players.delete(p.id);
-        }
-        state.spears = [];
-        state.coins = [];
-      }
-      syncBots(state, config);
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });
     });
   });

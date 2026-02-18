@@ -357,16 +357,20 @@ export class GameLoop {
     }
 
     const now = Date.now();
+    const DEATH_LINGER_MS = 1500;
     for (const player of this.state.players.values()) {
       if (!player.dead) continue;
-      if (now - (player.deadSince ?? 0) < RESPAWN_DELAY_MS) continue;
+      if (now - (player.deadSince ?? 0) < DEATH_LINGER_MS) continue;
 
-      player.dead = false;
-      player.hp = player.maxHp;
-      player.hasSpear = true;
-      const pos = this.state.randomPosition(player.radius + 5);
-      player.x = pos.x; player.y = pos.y;
-      player.vx = 0; player.vy = 0;
+      if (!player.isBot) {
+        this.io.to(player.id).emit("eliminated", {
+          playerId: player.id,
+          coins: player.coins ?? 0,
+          kills: player.kills ?? 0
+        });
+      }
+      this.state.players.delete(player.id);
+      this.state.spears = this.state.spears.filter((s) => s.ownerId !== player.id);
     }
   }
 
