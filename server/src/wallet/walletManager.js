@@ -66,6 +66,42 @@ export function calculateCashout(inGameBalance) {
 
 const processedSignatures = new Set();
 
+function getAllAccountKeys(tx) {
+  const msg = tx.transaction.message;
+  const staticKeys = msg.staticAccountKeys || msg.accountKeys || [];
+  const keys = staticKeys.map((k) => (typeof k.toBase58 === "function" ? k.toBase58() : String(k)));
+
+  if (tx.meta?.loadedAddresses) {
+    const w = tx.meta.loadedAddresses.writable || [];
+    const r = tx.meta.loadedAddresses.readonly || [];
+    for (const k of [...w, ...r]) {
+      keys.push(typeof k.toBase58 === "function" ? k.toBase58() : String(k));
+    }
+  }
+  return keys;
+}
+
+function findHouseDeposit(tx, houseWallet) {
+  const keys = getAllAccountKeys(tx);
+  const houseIndex = keys.findIndex((k) => k === houseWallet);
+
+  if (houseIndex !== -1) {
+    const received = tx.meta.postBalances[houseIndex] - tx.meta.preBalances[houseIndex];
+    if (received > 0) return received;
+  }
+
+  const innerIxs = tx.meta?.innerInstructions || [];
+  for (const group of innerIxs) {
+    for (const ix of group.instructions || []) {
+      if (ix.parsed?.type === "transfer" && ix.parsed?.info?.destination === houseWallet) {
+        return ix.parsed.info.lamports;
+      }
+    }
+  }
+
+  return 0;
+}
+
 export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
   const deposits = [];
   try {
@@ -80,11 +116,7 @@ export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
         const tx = await connection.getTransaction(sigInfo.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
         if (!tx || !tx.meta || tx.meta.err) continue;
 
-        const accounts = tx.transaction.message.staticAccountKeys || tx.transaction.message.accountKeys;
-        const houseIndex = accounts.findIndex((k) => k.toBase58() === houseWallet);
-        if (houseIndex === -1) continue;
-
-        const received = tx.meta.postBalances[houseIndex] - tx.meta.preBalances[houseIndex];
+        const received = findHouseDeposit(tx, houseWallet);
         if (received > 0) {
           processedSignatures.add(sigInfo.signature);
           deposits.push({ signature: sigInfo.signature, lamports: received });
@@ -98,19 +130,22 @@ export async function scanDepositsFrom(connection, senderAddress, houseWallet) {
 export async function verifyDeposit(connection, signature, expectedLamports, houseWallet) {
   try {
     const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
-    if (!tx || !tx.meta) return { valid: false, reason: "Transaction not found" };
-    if (tx.meta.err) return { valid: false, reason: "Transaction failed" };
+    if (!tx || !tx.meta) return { valid: false, reason: "Transaction not found. It may take a few seconds to confirm -- try again shortly." };
+    if (tx.meta.err) return { valid: false, reason: "Transaction failed on-chain" };
 
-    const postBalances = tx.meta.postBalances;
-    const preBalances = tx.meta.preBalances;
-    const accounts = tx.transaction.message.staticAccountKeys || tx.transaction.message.accountKeys;
+    const received = findHouseDeposit(tx, houseWallet);
 
-    const houseIndex = accounts.findIndex((k) => k.toBase58() === houseWallet);
-    if (houseIndex === -1) return { valid: false, reason: "House wallet not in transaction" };
+    if (received <= 0) {
+      const keys = getAllAccountKeys(tx);
+      const houseFound = keys.includes(houseWallet);
+      if (!houseFound) {
+        return { valid: false, reason: "House wallet not found in transaction. Make sure you sent SOL to the correct address." };
+      }
+      return { valid: false, reason: `No SOL received by house wallet. Balance change was non-positive. Verify you sent to: ${houseWallet.slice(0,6)}...${houseWallet.slice(-4)}` };
+    }
 
-    const received = postBalances[houseIndex] - preBalances[houseIndex];
-    if (received < expectedLamports * 0.99) {
-      return { valid: false, reason: `Insufficient amount: got ${received}, expected ${expectedLamports}` };
+    if (received < expectedLamports * 0.90) {
+      return { valid: false, reason: `Amount too low: received ${(received / LAMPORTS_PER_SOL).toFixed(6)} SOL, expected ~${(expectedLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL` };
     }
 
     processedSignatures.add(signature);
