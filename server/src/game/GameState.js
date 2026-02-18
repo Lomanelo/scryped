@@ -50,7 +50,7 @@ export class GameState {
       facingAngle: p.facingAngle ?? 0, color: p.color,
       kills: p.kills ?? 0, deaths: p.deaths ?? 0,
       lastDashAt: p.lastDashAt ?? 0, hitTime: p.hitTime ?? 0,
-      entryFee: p.entryFee ?? 0
+      entryFee: p.entryFee ?? 0, spawnedAt: p.spawnedAt ?? 0
     }));
   }
 

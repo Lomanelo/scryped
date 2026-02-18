@@ -77,7 +77,8 @@ socketClient.requestAuthConfig();
 function updateBalanceDisplay() {
   walletBalEl.textContent = `${balanceSol.toFixed(4)} SOL`;
   const usdVal = balanceSol * solPrice;
-  walletBalUsd.textContent = solPrice > 0 ? `\u2248 $${usdVal.toFixed(2)}` : "";
+  walletBalUsd.textContent = solPrice > 0 ? `$${usdVal.toFixed(2)}` : "$0.00";
+  updateEntryFeeDisplay();
   updateJoinBtn();
 }
 
@@ -134,6 +135,14 @@ signOutBtn.addEventListener("click", async () => {
   updateJoinBtn();
 });
 
+function updateEntryFeeDisplay() {
+  if (solPrice > 0) {
+    entryFeeSol = entryFeeUsd / solPrice;
+  }
+  document.getElementById("entryFeeBadge").textContent = `$${entryFeeUsd.toFixed(0)} (~${entryFeeSol.toFixed(4)} SOL)`;
+  document.getElementById("entryInfo").textContent = `Entry: $${entryFeeUsd.toFixed(2)} \u00b7 15% fee on cash out`;
+}
+
 socketClient.on("wallet:info", (data) => {
   walletInfo = data;
   entryFeeUsd = data.entryFeeUsd;
@@ -141,11 +150,11 @@ socketClient.on("wallet:info", (data) => {
   if (data.solPrice) solPrice = data.solPrice;
   if (data.rpcUrl) walletMgr.setRpc(data.rpcUrl);
   if (data.houseWallet) houseAddrDisplay.textContent = data.houseWallet;
-  document.getElementById("entryFeeBadge").textContent = `~${entryFeeSol.toFixed(4)} SOL`;
-  document.getElementById("entryInfo").textContent = `Entry: ~${entryFeeSol.toFixed(4)} SOL ($${entryFeeUsd.toFixed(2)}) \u00b7 15% fee on cash out`;
+  updateEntryFeeDisplay();
   updateBalanceDisplay();
 });
 socketClient.requestWalletInfo();
+setInterval(() => socketClient.requestWalletInfo(), 60_000);
 
 socketClient.on("wallet:balance", (data) => {
   balanceSol = data.balanceSol;
@@ -251,7 +260,8 @@ depositBtn.addEventListener("click", () => {
   }
   resetDepositModal();
   depositModal.style.display = "flex";
-  pathSelect.style.display = "";
+  pathSelect.style.display = "none";
+  transferView.style.display = "";
 });
 depositClose.addEventListener("click", resetDepositModal);
 
@@ -275,31 +285,74 @@ document.getElementById("copyHouseAddr").addEventListener("click", () => {
   }
 });
 
-document.querySelectorAll(".deposit-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    const usd = parseFloat(btn.dataset.usd);
-    if (!walletInfo) return;
+const depositAmountInput = document.getElementById("depositAmountInput");
+const depositConvertPreview = document.getElementById("depositConvertPreview");
+const depositSendBtn = document.getElementById("depositSendBtn");
+const depositModeSol = document.getElementById("depositModeSol");
+const depositModeUsd = document.getElementById("depositModeUsd");
+let depositMode = "sol";
 
-    if (!walletMgr.isConnected()) {
-      try {
-        depositStatus.textContent = "Connecting wallet...";
-        await walletMgr.connect();
-      } catch (err) {
-        depositStatus.textContent = `Error: ${err.message}`;
-        return;
-      }
-    }
+function setDepositMode(mode) {
+  depositMode = mode;
+  depositAmountInput.value = "";
+  depositConvertPreview.textContent = "";
+  if (mode === "sol") {
+    depositModeSol.style.background = "rgba(255,215,0,0.15)";
+    depositModeSol.style.color = "#ffd700";
+    depositModeSol.style.borderColor = "rgba(255,215,0,0.4)";
+    depositModeUsd.style.background = "rgba(0,0,0,0.2)";
+    depositModeUsd.style.color = "rgba(255,255,255,0.5)";
+    depositModeUsd.style.borderColor = "rgba(255,255,255,0.12)";
+    depositAmountInput.placeholder = "0.05";
+  } else {
+    depositModeUsd.style.background = "rgba(255,215,0,0.15)";
+    depositModeUsd.style.color = "#ffd700";
+    depositModeUsd.style.borderColor = "rgba(255,215,0,0.4)";
+    depositModeSol.style.background = "rgba(0,0,0,0.2)";
+    depositModeSol.style.color = "rgba(255,255,255,0.5)";
+    depositModeSol.style.borderColor = "rgba(255,255,255,0.12)";
+    depositAmountInput.placeholder = "5.00";
+  }
+}
 
-    const solAmount = usd / walletInfo.solPrice;
-    depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
+depositModeSol.addEventListener("click", () => setDepositMode("sol"));
+depositModeUsd.addEventListener("click", () => setDepositMode("usd"));
+
+depositAmountInput.addEventListener("input", () => {
+  const val = parseFloat(depositAmountInput.value);
+  if (!val || val <= 0 || solPrice <= 0) { depositConvertPreview.textContent = ""; return; }
+  if (depositMode === "sol") {
+    depositConvertPreview.textContent = `\u2248 $${(val * solPrice).toFixed(2)}`;
+  } else {
+    depositConvertPreview.textContent = `\u2248 ${(val / solPrice).toFixed(4)} SOL`;
+  }
+});
+
+depositSendBtn.addEventListener("click", async () => {
+  const val = parseFloat(depositAmountInput.value);
+  if (!val || val <= 0) { depositStatus.textContent = "Enter a valid amount"; return; }
+  if (!walletInfo) return;
+
+  const solAmount = depositMode === "sol" ? val : val / solPrice;
+
+  if (!walletMgr.isConnected()) {
     try {
-      const sig = await walletMgr.sendSol(walletInfo.houseWallet, solAmount);
-      depositStatus.textContent = "Verifying on-chain (this may take up to 30s)...";
-      socketClient.verifyDeposit(sig, solAmount);
+      depositStatus.textContent = "Connecting wallet...";
+      await walletMgr.connect();
     } catch (err) {
       depositStatus.textContent = `Error: ${err.message}`;
+      return;
     }
-  });
+  }
+
+  depositStatus.textContent = `Sending ${solAmount.toFixed(4)} SOL...`;
+  try {
+    const sig = await walletMgr.sendSol(walletInfo.houseWallet, solAmount);
+    depositStatus.textContent = "Verifying on-chain (this may take up to 30s)...";
+    socketClient.verifyDeposit(sig, solAmount);
+  } catch (err) {
+    depositStatus.textContent = `Error: ${err.message}`;
+  }
 });
 
 document.getElementById("cashOutBtn")?.addEventListener("click", () => {
@@ -716,6 +769,25 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
   }
 
   if (player.hasSpear) drawHeldBoomerang(px, py, fa, r, zoom, color);
+
+  const SPAWN_SHIELD_MS = 3000;
+  if (player.spawnedAt) {
+    const shieldRemaining = player.spawnedAt + SPAWN_SHIELD_MS - Date.now();
+    if (shieldRemaining > 0) {
+      const pulse = 0.4 + Math.sin(Date.now() * 0.008) * 0.15;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#7af0ff";
+      ctx.lineWidth = Math.max(2, r * 0.08);
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.arc(px, py, r + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
 }
 
 function spawnHitParticles(worldX, worldY, count) {

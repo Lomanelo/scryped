@@ -229,9 +229,12 @@ export class GameLoop {
   processShots() {
     const BOOM_SPEED = 180;
     const BOOM_MAX_DIST = 80;
+    const SPAWN_IMMUNITY_MS = 3000;
+    const now = Date.now();
 
     for (const player of this.state.players.values()) {
       if (player.dead) continue;
+      if (player.spawnedAt && now - player.spawnedAt < SPAWN_IMMUNITY_MS) continue;
       const input = player.lastInput;
       if (!input || !input.shoot) continue;
       input.shoot = false;
@@ -295,13 +298,13 @@ export class GameLoop {
   boomerangHitPlayers() {
     const OUTBOUND_DAMAGE = 1;
     const RETURN_DAMAGE = 3;
-    const RESPAWN_DELAY_MS = 1500;
+    const SPAWN_IMMUNITY_MS = 3000;
+    const now = Date.now();
 
     for (let i = this.state.spears.length - 1; i >= 0; i--) {
       const spear = this.state.spears[i];
       if (!spear.hitTargets) spear.hitTargets = new Set();
 
-      // Skip damage if owner is dead
       const owner = this.state.players.get(spear.ownerId);
       if (!owner || owner.dead) continue;
 
@@ -309,6 +312,7 @@ export class GameLoop {
         if (player.id === spear.ownerId) continue;
         if (player.dead) continue;
         if (spear.hitTargets.has(player.id)) continue;
+        if (player.spawnedAt && now - player.spawnedAt < SPAWN_IMMUNITY_MS) continue;
 
         const dx = player.x - spear.x;
         const dy = player.y - spear.y;
@@ -356,7 +360,6 @@ export class GameLoop {
       }
     }
 
-    const now = Date.now();
     const DEATH_LINGER_MS = 1500;
     for (const player of this.state.players.values()) {
       if (!player.dead) continue;
@@ -447,7 +450,7 @@ export function createInitialPlayer({ id, isBot = false }) {
     hp: 3, maxHp: 3, dead: false,
     hasSpear: true, lastShotAt: 0, lastDashAt: 0,
     facingAngle: 0, color: nextColor(),
-    kills: 0, deaths: 0, hitTime: 0, coins: 1, entryFee: 1,
+    kills: 0, deaths: 0, hitTime: 0, coins: 1, entryFee: 1, spawnedAt: Date.now(),
     lastInput: { moveX: 0, moveY: 0, shoot: false, dash: false, facingAngle: 0 },
     lastInputAt: 0, aiWander: 0
   };
