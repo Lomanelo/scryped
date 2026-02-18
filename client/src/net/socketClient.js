@@ -40,6 +40,10 @@ export function createSocketClient() {
     socket.on("wallet:deposit_success", (data) => emit("wallet:deposit_success", data));
     socket.on("cashout:success", (data) => emit("cashout:success", data));
     socket.on("arena:full", () => emit("arena:full", {}));
+    socket.on("auth:config", (data) => emit("auth:config", data));
+    socket.on("auth:success", (data) => emit("auth:success", data));
+    socket.on("auth:error", (data) => emit("auth:error", data));
+    socket.on("auth:wallet_updated", (data) => emit("auth:wallet_updated", data));
   }
 
   return {
@@ -55,6 +59,9 @@ export function createSocketClient() {
     onSnapshot(listener) { snapshotCb = listener; },
     on,
 
+    requestAuthConfig() { if (socket) socket.emit("auth:get_config"); },
+    authLogin(idToken) { if (socket) socket.emit("auth:login", { idToken }); },
+    setWalletAddress(walletAddress) { if (socket) socket.emit("auth:set_wallet", { walletAddress }); },
     requestWalletInfo() { if (socket) socket.emit("wallet:get_info"); },
     connectWallet(walletAddress) { if (socket) socket.emit("wallet:connect", { walletAddress }); },
     verifyDeposit(signature, amountSol) { if (socket) socket.emit("wallet:deposit_verify", { signature, amountSol }); },

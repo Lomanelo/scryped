@@ -2,6 +2,7 @@ import { createSocketClient } from "./net/socketClient.js";
 import { createControls } from "./input/controls.js";
 import { createHud } from "./ui/hud.js";
 import { createWalletManager } from "./wallet/solanaWallet.js";
+import { initFirebase, signInWithGoogle, signOut, waitForAuthReady, getIdToken } from "./auth/firebaseAuth.js";
 
 const appEl = document.getElementById("app");
 const hud = createHud();
@@ -22,6 +23,7 @@ let walletBalance = 0;
 let walletInfo = null;
 let entryFeeUsd = 1;
 let userWalletAddress = "";
+let isAuthenticated = false;
 let qHoldStart = 0;
 let qHolding = false;
 const Q_HOLD_DURATION = 3000;
@@ -46,7 +48,79 @@ const pathSelect = document.getElementById("depositPathSelect");
 const transferView = document.getElementById("depositTransferView");
 const receiveView = document.getElementById("depositReceiveView");
 
+const authSignedOut = document.getElementById("authSignedOut");
+const authSignedIn = document.getElementById("authSignedIn");
+const authStatus = document.getElementById("authStatus");
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+const signOutBtn = document.getElementById("signOutBtn");
+const authName = document.getElementById("authName");
+const authEmail = document.getElementById("authEmail");
+const authAvatar = document.getElementById("authAvatar");
+
 socketClient.connect();
+
+socketClient.on("auth:config", async (data) => {
+  if (data.enabled) {
+    await initFirebase(data);
+    const existingUser = await waitForAuthReady();
+    if (existingUser) {
+      const token = await getIdToken();
+      if (token) socketClient.authLogin(token);
+    }
+  }
+});
+socketClient.requestAuthConfig();
+
+socketClient.on("auth:success", (data) => {
+  isAuthenticated = true;
+  authSignedOut.style.display = "none";
+  authSignedIn.style.display = "";
+  authName.textContent = data.displayName || data.email;
+  authEmail.textContent = data.email;
+  authAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || data.email)}&background=1a2540&color=ffd700&size=64`;
+  walletBalance = data.balance || 0;
+  walletBalEl.textContent = `$${walletBalance.toFixed(2)}`;
+  if (data.walletAddress) {
+    userWalletAddress = data.walletAddress;
+    walletInput.value = data.walletAddress;
+  }
+  updateJoinBtn();
+});
+
+socketClient.on("auth:error", (data) => {
+  authStatus.textContent = data.message;
+  authStatus.style.color = "#ff6b6b";
+});
+
+socketClient.on("auth:wallet_updated", (data) => {
+  userWalletAddress = data.walletAddress;
+});
+
+googleSignInBtn.addEventListener("click", async () => {
+  authStatus.textContent = "Signing in...";
+  authStatus.style.color = "rgba(255,255,255,0.4)";
+  try {
+    const { idToken } = await signInWithGoogle();
+    authStatus.textContent = "Verifying...";
+    socketClient.authLogin(idToken);
+  } catch (err) {
+    authStatus.textContent = err.message?.includes("popup") ? "Sign-in cancelled" : `Error: ${err.message}`;
+    authStatus.style.color = "#ff6b6b";
+  }
+});
+
+signOutBtn.addEventListener("click", async () => {
+  await signOut();
+  isAuthenticated = false;
+  userWalletAddress = "";
+  walletBalance = 0;
+  walletBalEl.textContent = "$0.00";
+  walletInput.value = "";
+  authSignedOut.style.display = "";
+  authSignedIn.style.display = "none";
+  authStatus.textContent = "";
+  updateJoinBtn();
+});
 
 socketClient.on("wallet:info", (data) => {
   walletInfo = data;
@@ -94,8 +168,11 @@ document.getElementById("crClose").addEventListener("click", () => {
   startScreen.style.display = "";
 });
 
-function connectUserWallet(addr) {
+function saveWalletAddress(addr) {
   userWalletAddress = addr.trim();
+  if (isAuthenticated) {
+    socketClient.setWalletAddress(userWalletAddress);
+  }
   socketClient.connectWallet(userWalletAddress);
   updateJoinBtn();
 }
@@ -103,20 +180,20 @@ function connectUserWallet(addr) {
 walletInput.addEventListener("change", () => {
   const addr = walletInput.value.trim();
   if (addr.length >= 32 && addr.length <= 44) {
-    connectUserWallet(addr);
+    saveWalletAddress(addr);
   }
 });
 walletInput.addEventListener("paste", () => {
   setTimeout(() => {
     const addr = walletInput.value.trim();
     if (addr.length >= 32 && addr.length <= 44) {
-      connectUserWallet(addr);
+      saveWalletAddress(addr);
     }
   }, 50);
 });
 
 function updateJoinBtn() {
-  if (userWalletAddress && walletBalance >= entryFeeUsd) {
+  if (isAuthenticated && walletBalance >= entryFeeUsd) {
     joinBtn.classList.remove("btn-disabled");
   } else {
     joinBtn.classList.add("btn-disabled");
@@ -124,9 +201,11 @@ function updateJoinBtn() {
 }
 
 document.getElementById("refreshBalBtn").addEventListener("click", () => {
-  if (userWalletAddress) {
-    socketClient.connectWallet(userWalletAddress);
-    socketClient.checkDeposits(userWalletAddress);
+  if (isAuthenticated) {
+    if (userWalletAddress) {
+      socketClient.connectWallet(userWalletAddress);
+      socketClient.checkDeposits(userWalletAddress);
+    }
   }
 });
 
@@ -139,10 +218,8 @@ function resetDepositModal() {
 }
 
 depositBtn.addEventListener("click", () => {
-  if (!userWalletAddress) {
-    walletInput.focus();
-    walletInput.style.borderColor = "#ff4444";
-    setTimeout(() => { walletInput.style.borderColor = ""; }, 1500);
+  if (!isAuthenticated) {
+    googleSignInBtn.click();
     return;
   }
   resetDepositModal();
@@ -205,7 +282,7 @@ document.getElementById("cashOutBtn")?.addEventListener("click", () => {
 });
 
 joinBtn.addEventListener("click", () => {
-  if (!userWalletAddress || walletBalance < entryFeeUsd) return;
+  if (!isAuthenticated || walletBalance < entryFeeUsd) return;
   const name = nameInput.value.trim() || "";
   socketClient.joinGame(name);
 });
