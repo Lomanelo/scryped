@@ -134,4 +134,16 @@ export async function setUserBalance(uid, amountSol) {
   await db.collection("users").doc(uid).update({ balanceSol: amountSol });
 }
 
+export async function recordWithdrawal(uid, amountSol, walletAddress) {
+  if (!db) return null;
+  const ref = await db.collection("withdrawals").add({
+    uid,
+    amountSol,
+    walletAddress,
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return ref.id;
+}
+
 export { admin, db };

@@ -7,7 +7,8 @@ import {
 } from "../wallet/walletManager.js";
 import {
   isFirebaseEnabled, verifyToken, getOrCreateUser,
-  setUserWallet, getUserBalance, recordHouseFee, setUserBalance
+  setUserWallet, getUserBalance, recordHouseFee, setUserBalance,
+  recordWithdrawal
 } from "../auth/firebaseAdmin.js";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -228,6 +229,46 @@ export function attachSocketServer(io, gameLoop, state, config) {
       socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress: user.walletAddress });
     });
 
+    socket.on("wallet:withdraw", async (data) => {
+      try {
+        const user = getSocketUser(socket.id);
+        const uid = user?.uid;
+        if (!uid) return socket.emit("withdraw:error", { message: "Sign in first" });
+
+        const walletAddress = (data?.walletAddress || "").trim();
+        if (walletAddress.length < 32 || walletAddress.length > 44) {
+          return socket.emit("withdraw:error", { message: "Invalid Solana address" });
+        }
+
+        const bal = await getPlayerBalance(uid);
+        if (bal.balanceSol <= 0) {
+          return socket.emit("withdraw:error", { message: "Nothing to withdraw" });
+        }
+
+        const amountSol = bal.balanceSol;
+        const debited = await debitPlayerSol(uid, amountSol);
+        if (!debited) {
+          return socket.emit("withdraw:error", { message: "Failed to debit balance" });
+        }
+
+        const withdrawId = await recordWithdrawal(uid, amountSol, walletAddress);
+        console.log(`[withdraw] ${uid} requested ${amountSol.toFixed(6)} SOL to ${walletAddress} (id: ${withdrawId})`);
+
+        const newBal = await getPlayerBalance(uid);
+        const solPrice = await getSolPrice();
+        socket.emit("withdraw:success", {
+          amountSol,
+          walletAddress,
+          withdrawId,
+          balanceSol: newBal.balanceSol,
+          solPrice
+        });
+      } catch (err) {
+        console.error("[withdraw] Error:", err.message);
+        socket.emit("withdraw:error", { message: "Withdrawal failed. Try again." });
+      }
+    });
+
     socket.on("wallet:join_game", async (data) => {
       try {
         const user = getSocketUser(socket.id);
@@ -305,8 +346,10 @@ export function attachSocketServer(io, gameLoop, state, config) {
 
       const coins = player.coins ?? 1;
       const entryFeeSol = player.entryFeeSol || 0;
-      const payoutSol = entryFeeSol * coins * (1 - getHouseFee());
-      const feeSol = entryFeeSol * coins * getHouseFee();
+      const grossSol = entryFeeSol * coins;
+      const profitSol = Math.max(0, grossSol - entryFeeSol);
+      const feeSol = profitSol * getHouseFee();
+      const payoutSol = grossSol - feeSol;
 
       await creditPayoutSol(uid, payoutSol);
       await recordHouseFee(feeSol, uid);

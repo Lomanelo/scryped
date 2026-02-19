@@ -46,6 +46,8 @@ export function createSocketClient() {
     socket.on("auth:success", (data) => emit("auth:success", data));
     socket.on("auth:error", (data) => emit("auth:error", data));
     socket.on("auth:wallet_updated", (data) => emit("auth:wallet_updated", data));
+    socket.on("withdraw:success", (data) => emit("withdraw:success", data));
+    socket.on("withdraw:error", (data) => emit("withdraw:error", data));
   }
 
   return {
@@ -70,6 +72,7 @@ export function createSocketClient() {
     checkDeposits(walletAddress) { if (socket) socket.emit("wallet:check_deposits", { walletAddress }); },
     refreshBalance() { if (socket) socket.emit("wallet:refresh_balance"); },
     joinGame(name) { if (socket) socket.emit("wallet:join_game", { name }); },
-    cashout() { if (socket) socket.emit("cashout"); }
+    cashout() { if (socket) socket.emit("cashout"); },
+    withdraw(walletAddress) { if (socket) socket.emit("wallet:withdraw", { walletAddress }); }
   };
 }

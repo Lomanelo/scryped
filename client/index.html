@@ -309,7 +309,7 @@
               <div class="fee-badge active" id="entryFeeBadge">$1</div>
             </div>
             <button class="btn btn-green btn-disabled" id="joinBtn">&#9654; JOIN GAME</button>
-            <div class="entry-info" id="entryInfo">Entry: ~$1.00 &middot; 15% fee on cash out</div>
+            <div class="entry-info" id="entryInfo">Entry: ~$1.00 &middot; 15% fee on profits</div>
           </div>
         </div>
 
@@ -365,6 +365,26 @@
           </div>
 
           <button class="modal-close" id="depositClose">Cancel</button>
+        </div>
+      </div>
+
+      <div id="withdrawModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">
+        <div class="modal-card" style="max-width:340px;">
+          <h3>&#128184; Withdraw</h3>
+          <div class="modal-subtitle">Send your balance to your Solana wallet</div>
+          <div style="margin:16px 0 8px;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:4px;">Your balance</div>
+            <div id="withdrawBalDisplay" style="font-size:22px;font-weight:800;color:#ffd700;">0.0000 SOL</div>
+            <div id="withdrawBalUsd" style="font-size:13px;color:rgba(255,255,255,0.4);">$0.00</div>
+          </div>
+          <div style="margin:12px 0;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:4px;">Withdraw to</div>
+            <input type="text" id="withdrawWalletInput" placeholder="Your Solana address..." autocomplete="off" spellcheck="false"
+              style="width:100%;padding:10px 14px;font-size:13px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.3);color:#fff;outline:none;" />
+          </div>
+          <div id="withdrawStatus" style="font-size:12px;color:rgba(255,255,255,0.4);min-height:18px;margin-bottom:8px;"></div>
+          <button class="btn btn-gold" id="withdrawConfirmBtn" style="width:100%;">Withdraw All</button>
+          <button class="modal-close" id="withdrawClose" style="margin-top:8px;">Cancel</button>
         </div>
       </div>
 

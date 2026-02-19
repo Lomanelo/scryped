@@ -144,7 +144,7 @@ function updateEntryFeeDisplay() {
     entryFeeSol = entryFeeUsd / solPrice;
   }
   document.getElementById("entryFeeBadge").textContent = `$${entryFeeUsd.toFixed(0)} (~${entryFeeSol.toFixed(4)} SOL)`;
-  document.getElementById("entryInfo").textContent = `Entry: $${entryFeeUsd.toFixed(2)} \u00b7 15% fee on cash out`;
+  document.getElementById("entryInfo").textContent = `Entry: $${entryFeeUsd.toFixed(2)} \u00b7 15% fee on profits`;
 }
 
 socketClient.on("wallet:info", (data) => {
@@ -358,10 +358,62 @@ depositSendBtn.addEventListener("click", async () => {
   }
 });
 
+const withdrawModal = document.getElementById("withdrawModal");
+const withdrawBalDisplay = document.getElementById("withdrawBalDisplay");
+const withdrawBalUsd = document.getElementById("withdrawBalUsd");
+const withdrawWalletInput = document.getElementById("withdrawWalletInput");
+const withdrawStatus = document.getElementById("withdrawStatus");
+const withdrawConfirmBtn = document.getElementById("withdrawConfirmBtn");
+
 document.getElementById("cashOutBtn")?.addEventListener("click", () => {
-  if (walletBalance > 0) {
-    alert(`Your balance: $${walletBalance.toFixed(2)}\nWithdrawal to wallet coming soon.`);
+  if (!isAuthenticated) return;
+  withdrawBalDisplay.textContent = `${balanceSol.toFixed(4)} SOL`;
+  withdrawBalUsd.textContent = solPrice > 0 ? `$${(balanceSol * solPrice).toFixed(2)}` : "";
+  withdrawWalletInput.value = userWalletAddress || "";
+  withdrawStatus.textContent = "";
+  withdrawConfirmBtn.disabled = false;
+  withdrawConfirmBtn.textContent = "Withdraw All";
+  withdrawModal.style.display = "flex";
+});
+
+document.getElementById("withdrawClose")?.addEventListener("click", () => {
+  withdrawModal.style.display = "none";
+});
+
+withdrawConfirmBtn?.addEventListener("click", async () => {
+  const addr = withdrawWalletInput.value.trim();
+  if (!addr || addr.length < 32 || addr.length > 44) {
+    withdrawStatus.textContent = "Enter a valid Solana address.";
+    withdrawStatus.style.color = "#ff6b6b";
+    return;
   }
+  if (balanceSol <= 0) {
+    withdrawStatus.textContent = "Nothing to withdraw.";
+    withdrawStatus.style.color = "#ff6b6b";
+    return;
+  }
+  withdrawConfirmBtn.disabled = true;
+  withdrawConfirmBtn.textContent = "Processing...";
+  withdrawStatus.textContent = "Submitting withdrawal request...";
+  withdrawStatus.style.color = "rgba(255,255,255,0.5)";
+  socketClient.withdraw(addr);
+});
+
+socketClient.on("withdraw:success", (data) => {
+  withdrawStatus.textContent = `Withdrawal of ${data.amountSol.toFixed(4)} SOL queued. You'll receive it shortly.`;
+  withdrawStatus.style.color = "#7cf7b2";
+  withdrawConfirmBtn.textContent = "Done";
+  balanceSol = data.balanceSol ?? 0;
+  if (data.solPrice) solPrice = data.solPrice;
+  updateBalanceDisplay();
+  setTimeout(() => { withdrawModal.style.display = "none"; }, 3000);
+});
+
+socketClient.on("withdraw:error", (data) => {
+  withdrawStatus.textContent = data.message || "Withdrawal failed.";
+  withdrawStatus.style.color = "#ff6b6b";
+  withdrawConfirmBtn.disabled = false;
+  withdrawConfirmBtn.textContent = "Withdraw All";
 });
 
 joinBtn.addEventListener("click", () => {
@@ -393,7 +445,7 @@ let seq = 0;
 let serverX = 0, serverY = 0, renderX = 0, renderY = 0;
 let localRadius = 10, localName = "", localHasSpear = true;
 let localHp = 3, localMaxHp = 3, localDead = false;
-let localColor = "#7cf7b2", localKills = 0, localDeaths = 0, localCoins = 0, localLastDashAt = 0;
+let localColor = "#7cf7b2", localKills = 0, localDeaths = 0, localCoins = 0, localLastDashAt = 0, localHitTime = 0;
 let worldWidth = 3000, worldHeight = 3000, currentZoom = 6, facingAngle = 0, showRangeCircle = true;
 let lastTime = performance.now(), spinAngle = 0;
 let lastInputSend = 0;
@@ -450,6 +502,7 @@ socketClient.onSnapshot((next) => {
     localHasSpear = me.hasSpear; localHp = me.hp; localMaxHp = me.maxHp;
     localDead = me.dead; localColor = me.color || "#7cf7b2";
     localKills = me.kills ?? 0; localDeaths = me.deaths ?? 0; localCoins = me.coins ?? 0;
+    localHitTime = me.hitTime ?? 0;
     prevHp = me.hp;
 
     if (me.dashing && !prevDashing) {
@@ -922,7 +975,7 @@ function drawKillFeed(dt) {
 }
 
 function drawDashCooldownIndicator(px, py, r) {
-  const DASH_COOLDOWN_MS = 1700;
+  const DASH_COOLDOWN_MS = 2100;
   const elapsed = Date.now() - localLastDashAt;
   if (elapsed >= DASH_COOLDOWN_MS) return;
   const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
@@ -936,6 +989,124 @@ function drawDashCooldownIndicator(px, py, r) {
   ctx.font = `bold ${Math.max(7, indicatorR * 0.7)}px Inter, Arial`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("\u21e7", ix, iy); ctx.globalAlpha = 1;
+}
+
+function drawBottomHud() {
+  const W = canvas.width, H = canvas.height;
+  const barW = 280, barH = 52;
+  const bx = (W - barW) * 0.5, by = H - barH - 16;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8,12,22,0.65)";
+  ctx.strokeStyle = "rgba(120,160,255,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, barW, barH, 14);
+  ctx.fill(); ctx.stroke();
+
+  const DASH_CD = 2100;
+  const REGEN_CD = 20000;
+  const now = Date.now();
+
+  const heartSize = 11;
+  const heartSpacing = heartSize * 1.5;
+  const heartsW = localMaxHp * heartSpacing;
+  const hsx = bx + 18;
+  const hsy = by + barH * 0.5;
+
+  for (let i = 0; i < localMaxHp; i++) {
+    const hx = hsx + i * heartSpacing + heartSize * 0.5;
+    ctx.save(); ctx.translate(hx, hsy);
+    ctx.beginPath();
+    ctx.moveTo(0, heartSize * 0.35);
+    ctx.bezierCurveTo(-heartSize, -heartSize * 0.3, -heartSize * 0.5, -heartSize, 0, -heartSize * 0.4);
+    ctx.bezierCurveTo(heartSize * 0.5, -heartSize, heartSize, -heartSize * 0.3, 0, heartSize * 0.35);
+    ctx.closePath();
+    if (i < localHp) {
+      ctx.fillStyle = "#ef4444"; ctx.fill();
+      ctx.strokeStyle = "#991b1b"; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
+
+      if (i === localHp && localHp > 0 && localHitTime) {
+        const elapsed = now - localHitTime;
+        const prog = Math.min(1, elapsed / REGEN_CD);
+        if (prog > 0 && prog < 1) {
+          ctx.save(); ctx.beginPath();
+          ctx.moveTo(0, heartSize * 0.35);
+          ctx.bezierCurveTo(-heartSize, -heartSize * 0.3, -heartSize * 0.5, -heartSize, 0, -heartSize * 0.4);
+          ctx.bezierCurveTo(heartSize * 0.5, -heartSize, heartSize, -heartSize * 0.3, 0, heartSize * 0.35);
+          ctx.closePath(); ctx.clip();
+          const fillH = heartSize * 1.4 * prog;
+          ctx.globalAlpha = 0.3 + prog * 0.5;
+          ctx.fillStyle = "#ef4444";
+          ctx.fillRect(-heartSize, heartSize * 0.35 - fillH, heartSize * 2, fillH);
+          ctx.restore();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  const secLeft = localHitTime && localHp < localMaxHp ? Math.max(0, Math.ceil((REGEN_CD - (now - localHitTime)) / 1000)) : 0;
+  if (secLeft > 0 && secLeft <= 20) {
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.font = "bold 9px Inter, Arial";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(`${secLeft}s`, hsx + heartsW + 2, hsy);
+  }
+
+  const dashX = bx + barW * 0.5 + 8;
+  const dashElapsed = now - localLastDashAt;
+  const dashProg = Math.min(1, dashElapsed / DASH_CD);
+  const dashReady = dashProg >= 1;
+  const dashBarW = 60, dashBarH = 8;
+  const dashBarY = hsy - dashBarH * 0.5;
+
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW, dashBarH, 4); ctx.fill();
+
+  if (dashReady) {
+    ctx.fillStyle = "#7af0ff";
+  } else {
+    ctx.fillStyle = "rgba(122,240,255,0.5)";
+  }
+  ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW * dashProg, dashBarH, 4); ctx.fill();
+
+  ctx.fillStyle = dashReady ? "#7af0ff" : "rgba(122,240,255,0.5)";
+  ctx.font = "bold 9px Inter, Arial";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(dashReady ? "DASH" : "⇧", dashX + dashBarW * 0.5, hsy - 14);
+
+  const boomX = dashX + dashBarW + 16;
+  const boomR = 10;
+  const boomReady = localHasSpear;
+  ctx.beginPath(); ctx.arc(boomX + boomR, hsy, boomR, 0, Math.PI * 2);
+  ctx.fillStyle = boomReady ? "rgba(245,197,66,0.2)" : "rgba(255,255,255,0.04)";
+  ctx.fill();
+  ctx.strokeStyle = boomReady ? "#f5c542" : "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1.5; ctx.stroke();
+
+  if (boomReady) {
+    const s = boomR * 0.5, aw = s * 0.22, cx = boomX + boomR, cy = hsy;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI * 0.25);
+    ctx.fillStyle = "#f5c542"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, aw); ctx.lineTo(s, -s * 0.5 + aw);
+    ctx.lineTo(s * 0.9, -s * 0.5 - aw); ctx.lineTo(0, -aw);
+    ctx.lineTo(-s * 0.5 + aw, -s); ctx.lineTo(-s * 0.5 - aw, -s * 0.9);
+    ctx.lineTo(-aw, 0); ctx.lineTo(0, aw); ctx.closePath();
+    ctx.fill(); ctx.stroke(); ctx.restore();
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.font = "bold 9px Inter, Arial";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("...", boomX + boomR, hsy);
+  }
+
+  ctx.restore();
 }
 
 
@@ -1101,13 +1272,16 @@ function tick() {
 
   drawKillFeed(dt);
   drawMinimap();
+  if (!localDead) drawBottomHud();
 
   if (qHolding && gameStarted && !localDead) {
     const elapsed = Date.now() - qHoldStart;
     const progress = Math.min(1, elapsed / Q_HOLD_DURATION);
     const mePlayer = snapshot?.players?.find((pl) => pl.id === socketClient.getPlayerId());
     const totalCoins = mePlayer?.coins ?? localCoins;
-    const payout = totalCoins * (1 - 0.15);
+    const profit = Math.max(0, totalCoins - 1);
+    const fee = profit * 0.15;
+    const payout = totalCoins - fee;
 
     const ringR = r + 8;
     const ringWidth = Math.max(4, r * 0.12);
