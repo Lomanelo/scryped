@@ -26,26 +26,28 @@ let bgSimLastTime = performance.now();
 let lightMode = localStorage.getItem("scryped_theme") === "light";
 const THEME = {
   get dark() { return !lightMode; },
-  get bgGrad1() { return lightMode ? "#e8ecf2" : "#141e30"; },
-  get bgGrad2() { return lightMode ? "#d0d6e0" : "#0a0f1a"; },
-  get dotColor() { return lightMode ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.06)"; },
-  get crossColor() { return lightMode ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.035)"; },
-  get borderColor() { return lightMode ? "rgba(200,40,40,0.35)" : "rgba(255,80,80,0.3)"; },
-  get borderGlow() { return lightMode ? "rgba(200,40,40,0.08)" : "rgba(255,80,80,0.06)"; },
-  get minimapBg() { return lightMode ? "rgba(220,225,235,0.85)" : "rgba(10,15,26,0.75)"; },
-  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.2)"; },
-  get hudBg() { return lightMode ? "rgba(240,243,248,0.75)" : "rgba(8,12,22,0.65)"; },
-  get hudBorder() { return lightMode ? "rgba(100,120,160,0.2)" : "rgba(120,160,255,0.18)"; },
-  get textColor() { return lightMode ? "#1a2030" : "#fff"; },
-  get textDim() { return lightMode ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)"; },
-  get feedBg() { return lightMode ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)"; },
-  get feedText() { return lightMode ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)"; },
-  get playerStroke() { return lightMode ? -0.2 : -0.3; },
-  get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.3)"; },
-  get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.15)"; },
-  get coinBadgeBg() { return lightMode ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)"; },
-  get menuBgGrad1() { return lightMode ? "rgba(220,225,240,0.85)" : "rgba(26,37,64,0.82)"; },
-  get menuBgGrad2() { return lightMode ? "rgba(200,208,225,0.9)" : "rgba(10,15,26,0.88)"; },
+  get bgGrad1() { return lightMode ? "#dce1ea" : "#141e30"; },
+  get bgGrad2() { return lightMode ? "#c8cfd8" : "#0a0f1a"; },
+  get dotColor() { return lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.06)"; },
+  get crossColor() { return lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.035)"; },
+  get borderColor() { return lightMode ? "rgba(180,30,30,0.5)" : "rgba(255,80,80,0.3)"; },
+  get borderGlow() { return lightMode ? "rgba(180,30,30,0.12)" : "rgba(255,80,80,0.06)"; },
+  get minimapBg() { return lightMode ? "rgba(255,255,255,0.82)" : "rgba(10,15,26,0.75)"; },
+  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)"; },
+  get hudBg() { return lightMode ? "rgba(255,255,255,0.82)" : "rgba(8,12,22,0.65)"; },
+  get hudBorder() { return lightMode ? "rgba(60,80,120,0.3)" : "rgba(120,160,255,0.18)"; },
+  get textColor() { return lightMode ? "#111820" : "#fff"; },
+  get textDim() { return lightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.4)"; },
+  get feedBg() { return lightMode ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.4)"; },
+  get feedText() { return lightMode ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.6)"; },
+  get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.3)"; },
+  get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)"; },
+  get coinBadgeBg() { return lightMode ? "rgba(40,35,20,0.6)" : "rgba(0,0,0,0.55)"; },
+  get coinText() { return lightMode ? "#ffe040" : "#ffd700"; },
+  get eyeWhite() { return lightMode ? "#f0f0f0" : "#ffffff"; },
+  get eyeStroke() { return lightMode ? "rgba(0,0,0,0.25)" : "none"; },
+  get menuBgGrad1() { return lightMode ? "rgba(210,215,230,0.92)" : "rgba(26,37,64,0.82)"; },
+  get menuBgGrad2() { return lightMode ? "rgba(190,198,215,0.95)" : "rgba(10,15,26,0.88)"; },
 };
 
 let balanceSol = 0;
@@ -396,9 +398,9 @@ function applyTheme() {
   const ss = document.getElementById("startScreen");
   if (ss) {
     ss.style.background = lightMode
-      ? "radial-gradient(ellipse at 50% 30%, rgba(220,225,240,0.92) 0%, rgba(200,208,225,0.95) 70%)"
+      ? "radial-gradient(ellipse at 50% 30%, rgba(210,215,230,0.94) 0%, rgba(190,198,215,0.97) 70%)"
       : "radial-gradient(ellipse at 50% 30%, rgba(26,37,64,0.82) 0%, rgba(10,15,26,0.88) 70%)";
-    ss.style.color = lightMode ? "#1a2030" : "#fff";
+    ss.style.color = lightMode ? "#111820" : "#fff";
   }
   if (themeToggleBtn) {
     themeToggleBtn.innerHTML = lightMode ? "&#9728;" : "&#9789;";
@@ -825,7 +827,7 @@ const BOOM_RANGE = 84;
 function drawRangeCircle(px, py, playerRadius, zoom, color) {
   const rangeR = (BOOM_RANGE + playerRadius) * zoom;
   ctx.setLineDash([8, 6]); ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5; ctx.globalAlpha = 0.2;
+  ctx.lineWidth = 1.5; ctx.globalAlpha = lightMode ? 0.4 : 0.2;
   ctx.beginPath(); ctx.arc(px, py, rangeR, 0, Math.PI * 2); ctx.stroke();
   ctx.setLineDash([]); ctx.globalAlpha = 1;
 }
@@ -837,7 +839,8 @@ function drawEyes(px, py, r, facing) {
   for (const side of [-1, 1]) {
     const ex = px + perpX * eyeOffset * side + fwdX * r * 0.6;
     const ey = py + perpY * eyeOffset * side + fwdY * r * 0.6;
-    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = THEME.eyeWhite; ctx.beginPath(); ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); ctx.fill();
+    if (lightMode) { ctx.strokeStyle = THEME.eyeStroke; ctx.lineWidth = 1; ctx.stroke(); }
     ctx.fillStyle = "#111"; ctx.beginPath();
     ctx.arc(ex + fwdX * eyeSize * 0.35, ey + fwdY * eyeSize * 0.35, pupilSize, 0, Math.PI * 2); ctx.fill();
   }
@@ -886,7 +889,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     ctx.arc(px, py, badgeR, 0, Math.PI * 2);
     ctx.fillStyle = THEME.coinBadgeBg;
     ctx.fill();
-    ctx.strokeStyle = "#ffd700";
+    ctx.strokeStyle = lightMode ? "#c8a000" : "#ffd700";
     ctx.lineWidth = Math.max(1.5, badgeR * 0.12);
     ctx.stroke();
 
@@ -894,7 +897,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "#ffd700";
+    ctx.fillStyle = THEME.coinText;
     ctx.fillText(coins, px, py + 1);
   }
 
@@ -907,7 +910,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
       const pulse = 0.4 + Math.sin(Date.now() * 0.008) * 0.15;
       ctx.save();
       ctx.globalAlpha = pulse;
-      ctx.strokeStyle = "#7af0ff";
+      ctx.strokeStyle = lightMode ? "#1a8aaa" : "#7af0ff";
       ctx.lineWidth = Math.max(2, r * 0.08);
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -990,7 +993,7 @@ function drawDashTrail(cameraX, cameraY, zoom, r) {
 
 function drawSpeedLines(px, py, r, dirX, dirY, progress) {
   const count = 6; ctx.globalAlpha = Math.max(0, 1 - progress) * 0.6;
-  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1.5, r * 0.04); ctx.lineCap = "round";
+  ctx.strokeStyle = lightMode ? "#3a4a60" : "#ffffff"; ctx.lineWidth = Math.max(1.5, r * 0.04); ctx.lineCap = "round";
   const perpX = -dirY, perpY = dirX;
   for (let i = 0; i < count; i++) {
     const t = (i / (count - 1)) - 0.5;
@@ -1035,11 +1038,11 @@ function drawDashCooldownIndicator(px, py, r) {
   const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
   const indicatorR = Math.max(8, r * 0.3);
   const ix = px + r + indicatorR + 6, iy = py;
-  ctx.globalAlpha = 0.5; ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.globalAlpha = 0.5; ctx.fillStyle = lightMode ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.5)";
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 0.8; ctx.strokeStyle = "#7af0ff"; ctx.lineWidth = 2.5;
+  ctx.globalAlpha = 0.8; ctx.strokeStyle = lightMode ? "#1a8aaa" : "#7af0ff"; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR - 2, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress); ctx.stroke();
-  ctx.globalAlpha = 0.7; ctx.fillStyle = "#fff";
+  ctx.globalAlpha = 0.7; ctx.fillStyle = lightMode ? "#1a3040" : "#fff";
   ctx.font = `bold ${Math.max(7, indicatorR * 0.7)}px Inter, Arial`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("\u21e7", ix, iy); ctx.globalAlpha = 1;
@@ -1080,8 +1083,8 @@ function drawBottomHud() {
       ctx.fillStyle = "#ef4444"; ctx.fill();
       ctx.strokeStyle = "#991b1b"; ctx.lineWidth = 1; ctx.stroke();
     } else {
-      ctx.fillStyle = lightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)"; ctx.fill();
-      ctx.strokeStyle = lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)"; ctx.fill();
+      ctx.strokeStyle = lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
 
       if (i === localHp && localHp > 0 && localHitTime) {
         const elapsed = now - localHitTime;
@@ -1105,7 +1108,7 @@ function drawBottomHud() {
 
   const secLeft = localHitTime && localHp < localMaxHp ? Math.max(0, Math.ceil((REGEN_CD - (now - localHitTime)) / 1000)) : 0;
   if (secLeft > 0 && secLeft <= 20) {
-    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
+    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.3)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(`${secLeft}s`, hsx + heartsW + 2, hsy);
@@ -1118,17 +1121,17 @@ function drawBottomHud() {
   const dashBarW = 60, dashBarH = 8;
   const dashBarY = hsy - dashBarH * 0.5;
 
-  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
+  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.06)";
   ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW, dashBarH, 4); ctx.fill();
 
   if (dashReady) {
-    ctx.fillStyle = "#7af0ff";
+    ctx.fillStyle = lightMode ? "#1a9ab5" : "#7af0ff";
   } else {
-    ctx.fillStyle = "rgba(122,240,255,0.5)";
+    ctx.fillStyle = lightMode ? "rgba(26,154,181,0.5)" : "rgba(122,240,255,0.5)";
   }
   ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW * dashProg, dashBarH, 4); ctx.fill();
 
-  ctx.fillStyle = dashReady ? "#7af0ff" : "rgba(122,240,255,0.5)";
+  ctx.fillStyle = dashReady ? (lightMode ? "#1a9ab5" : "#7af0ff") : (lightMode ? "rgba(26,154,181,0.5)" : "rgba(122,240,255,0.5)");
   ctx.font = "bold 9px Inter, Arial";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(dashReady ? "DASH" : "⇧", dashX + dashBarW * 0.5, hsy - 14);
@@ -1137,9 +1140,9 @@ function drawBottomHud() {
   const boomR = 10;
   const boomReady = localHasSpear;
   ctx.beginPath(); ctx.arc(boomX + boomR, hsy, boomR, 0, Math.PI * 2);
-  ctx.fillStyle = boomReady ? "rgba(245,197,66,0.2)" : (lightMode ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.04)");
+  ctx.fillStyle = boomReady ? (lightMode ? "rgba(200,160,30,0.25)" : "rgba(245,197,66,0.2)") : (lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.04)");
   ctx.fill();
-  ctx.strokeStyle = boomReady ? "#f5c542" : (lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)");
+  ctx.strokeStyle = boomReady ? (lightMode ? "#b08a10" : "#f5c542") : (lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.12)");
   ctx.lineWidth = 1.5; ctx.stroke();
 
   if (boomReady) {
@@ -1154,14 +1157,14 @@ function drawBottomHud() {
     ctx.lineTo(-aw, 0); ctx.lineTo(0, aw); ctx.closePath();
     ctx.fill(); ctx.stroke(); ctx.restore();
   } else {
-    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)";
+    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.2)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("...", boomX + boomR, hsy);
   }
 
   const themeIcon = lightMode ? "\u2600" : "\u263D";
-  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.18)";
+  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.18)";
   ctx.font = "bold 9px Inter, Arial";
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.fillText(`${themeIcon} L`, bx + barW - 10, by + barH * 0.5);

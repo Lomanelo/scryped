@@ -249,60 +249,69 @@
       .cashout-divider { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0; }
 
       /* Light theme overrides */
-      body.light-theme { background: #e8ecf2; color: #1a2030; }
+      body.light-theme { background: #d4d9e3; color: #111820; }
       body.light-theme .card {
-        background: rgba(255,255,255,0.85); border-color: rgba(0,0,0,0.08);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+        background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.12);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
       }
-      body.light-theme .card-title { color: rgba(0,0,0,0.5); }
-      body.light-theme .logo-title .snap { color: #1a2030; }
-      body.light-theme .logo-subtitle { color: rgba(180,150,0,0.7); }
-      body.light-theme .wallet-balance-usd { color: #1a2030; }
-      body.light-theme .wallet-balance { color: rgba(0,0,0,0.5); }
-      body.light-theme .wallet-balance-sub { color: rgba(0,0,0,0.4); }
-      body.light-theme .auth-email { color: rgba(0,0,0,0.45); }
-      body.light-theme .auth-signout { color: rgba(0,0,0,0.35); }
-      body.light-theme .auth-signout:hover { color: #1a2030; }
+      body.light-theme .card-title { color: rgba(0,0,0,0.65); }
+      body.light-theme .logo-title .snap { color: #111820; }
+      body.light-theme .logo-subtitle { color: #9a7b00; }
+      body.light-theme .wallet-balance-usd { color: #111820; }
+      body.light-theme .wallet-balance { color: rgba(0,0,0,0.6); }
+      body.light-theme .wallet-balance-sub { color: rgba(0,0,0,0.55); }
+      body.light-theme .auth-email { color: rgba(0,0,0,0.6); }
+      body.light-theme .auth-name { color: #111820; }
+      body.light-theme .auth-signout { color: rgba(0,0,0,0.5); }
+      body.light-theme .auth-signout:hover { color: #111820; }
       body.light-theme .btn-google {
-        background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.12); color: #1a2030;
+        background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.18); color: #111820;
       }
-      body.light-theme .btn-google:hover { background: rgba(0,0,0,0.08); border-color: rgba(0,0,0,0.2); }
-      body.light-theme .btn-outline { border-color: rgba(0,0,0,0.15); color: #1a2030; }
-      body.light-theme .auth-status { color: rgba(0,0,0,0.4); }
+      body.light-theme .btn-google:hover { background: rgba(0,0,0,0.1); border-color: rgba(0,0,0,0.28); }
+      body.light-theme .btn-outline { border-color: rgba(0,0,0,0.22); color: #111820; }
+      body.light-theme .auth-status { color: rgba(0,0,0,0.55); }
       body.light-theme .wallet-input {
-        background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.12); color: #1a2030;
+        background: rgba(255,255,255,0.95); border-color: rgba(0,0,0,0.18); color: #111820;
       }
-      body.light-theme .wallet-input::placeholder { color: rgba(0,0,0,0.25); }
-      body.light-theme .wallet-label { color: rgba(0,0,0,0.35); }
+      body.light-theme .wallet-input::placeholder { color: rgba(0,0,0,0.35); }
+      body.light-theme .wallet-label { color: rgba(0,0,0,0.55); }
       body.light-theme #nameInput {
-        background: rgba(255,255,255,0.9); border-color: rgba(180,150,0,0.25); color: #1a2030;
+        background: rgba(255,255,255,0.95); border-color: rgba(160,130,0,0.35); color: #111820;
       }
-      body.light-theme #nameInput::placeholder { color: rgba(0,0,0,0.25); }
-      body.light-theme .entry-info { color: rgba(0,0,0,0.35); }
-      body.light-theme .controls-hint { color: rgba(0,0,0,0.3); }
-      body.light-theme .controls-hint span { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.45); }
+      body.light-theme #nameInput::placeholder { color: rgba(0,0,0,0.35); }
+      body.light-theme .entry-info { color: rgba(0,0,0,0.55); }
+      body.light-theme .controls-hint { color: rgba(0,0,0,0.45); }
+      body.light-theme .controls-hint span { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.6); }
       body.light-theme .modal-card {
-        background: #f0f2f8; border-color: rgba(0,0,0,0.1); color: #1a2030;
+        background: #eef0f6; border-color: rgba(0,0,0,0.14); color: #111820;
       }
-      body.light-theme .modal-subtitle { color: rgba(0,0,0,0.45); }
-      body.light-theme .modal-close { color: rgba(0,0,0,0.4); }
-      body.light-theme .modal-close:hover { color: #1a2030; }
-      body.light-theme .house-address-box { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
-      body.light-theme .house-address-label { color: rgba(0,0,0,0.4); }
-      body.light-theme .deposit-status { color: rgba(0,0,0,0.5); }
-      body.light-theme .deposit-path { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
-      body.light-theme .deposit-path:hover { background: rgba(255,215,0,0.06); border-color: rgba(180,150,0,0.3); }
-      body.light-theme .deposit-path-desc { color: rgba(0,0,0,0.45); }
-      body.light-theme .refresh-bal-btn { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.4); }
-      body.light-theme .refresh-bal-btn:hover { background: rgba(0,0,0,0.1); color: #1a2030; }
+      body.light-theme .modal-subtitle { color: rgba(0,0,0,0.6); }
+      body.light-theme .modal-close { color: rgba(0,0,0,0.55); }
+      body.light-theme .modal-close:hover { color: #111820; }
+      body.light-theme .house-address-box { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
+      body.light-theme .house-address-label { color: rgba(0,0,0,0.55); }
+      body.light-theme .house-address-val { color: #9a7b00; }
+      body.light-theme .deposit-status { color: rgba(0,0,0,0.6); }
+      body.light-theme .deposit-path { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.12); }
+      body.light-theme .deposit-path:hover { background: rgba(255,215,0,0.1); border-color: rgba(160,130,0,0.4); }
+      body.light-theme .deposit-path-title { color: #111820; }
+      body.light-theme .deposit-path-desc { color: rgba(0,0,0,0.6); }
+      body.light-theme .refresh-bal-btn { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.55); }
+      body.light-theme .refresh-bal-btn:hover { background: rgba(0,0,0,0.14); color: #111820; }
       body.light-theme .cashout-result-card {
-        background: #f0f2f8; border-color: rgba(180,150,0,0.2); color: #1a2030;
+        background: #eef0f6; border-color: rgba(160,130,0,0.3); color: #111820;
       }
-      body.light-theme .cashout-row .label { color: rgba(0,0,0,0.5); }
-      body.light-theme .cashout-divider { border-top-color: rgba(0,0,0,0.08); }
-      body.light-theme .cashout-label { color: rgba(0,0,0,0.5); }
-      body.light-theme #hud { background: rgba(240,243,248,0.7); border-color: rgba(100,120,160,0.2); color: #1a2030; }
-      body.light-theme #banner { background: rgba(240,243,248,0.8); border-color: rgba(100,120,160,0.25); color: #1a2030; }
+      body.light-theme .cashout-row .label { color: rgba(0,0,0,0.6); }
+      body.light-theme .cashout-divider { border-top-color: rgba(0,0,0,0.12); }
+      body.light-theme .cashout-label { color: rgba(0,0,0,0.65); }
+      body.light-theme .fee-badge { background: rgba(160,130,0,0.15); border-color: rgba(160,130,0,0.4); color: #9a7b00; }
+      body.light-theme .fee-badge.active { background: rgba(160,130,0,0.25); border-color: #9a7b00; }
+      body.light-theme .copy-btn { background: rgba(160,130,0,0.15); color: #9a7b00; }
+      body.light-theme .copy-btn:hover { background: rgba(160,130,0,0.3); }
+      body.light-theme .deposit-btn { border-color: rgba(160,130,0,0.35); background: rgba(160,130,0,0.1); color: #9a7b00; }
+      body.light-theme .deposit-btn:hover { background: rgba(160,130,0,0.2); border-color: #9a7b00; }
+      body.light-theme #hud { background: rgba(255,255,255,0.8); border-color: rgba(60,80,120,0.2); color: #111820; }
+      body.light-theme #banner { background: rgba(255,255,255,0.85); border-color: rgba(60,80,120,0.25); color: #111820; }
     </style>
   </head>
   <body>
