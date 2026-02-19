@@ -279,7 +279,7 @@ export function attachSocketServer(io, gameLoop, state, config) {
             world: { width: config.worldWidth, height: config.worldHeight }
           },
           inGameBalance: player.inGameBalance,
-          entryFee
+          entryFee: player.entryFee
         });
         io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
       } catch (err) {
