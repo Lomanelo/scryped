@@ -3,6 +3,7 @@ import { createControls } from "./input/controls.js";
 import { createHud } from "./ui/hud.js";
 import { createWalletManager } from "./wallet/solanaWallet.js";
 import { initFirebase, signInWithGoogle, signOut, waitForAuthReady, getIdToken } from "./auth/firebaseAuth.js";
+import { createBgSim } from "./bgSim.js";
 
 const appEl = document.getElementById("app");
 const hud = createHud();
@@ -19,6 +20,9 @@ const ctx = canvas.getContext("2d");
 const controls = createControls(canvas);
 
 let gameStarted = false;
+const bgSim = createBgSim();
+let bgSimLastTime = performance.now();
+
 let balanceSol = 0;
 let solPrice = 0;
 let walletInfo = null;
@@ -179,6 +183,7 @@ socketClient.on("game:started", () => {
 
 socketClient.on("cashout:success", (data) => {
   gameStarted = false;
+  bgSimLastTime = performance.now();
   balanceSol = data.balanceSol;
   if (data.solPrice) solPrice = data.solPrice;
   updateBalanceDisplay();
@@ -191,6 +196,7 @@ socketClient.on("cashout:success", (data) => {
 
 socketClient.on("eliminated", () => {
   gameStarted = false;
+  bgSimLastTime = performance.now();
   cashoutOverlay.style.display = "none";
   qHolding = false;
   startScreen.style.display = "";
@@ -666,7 +672,8 @@ function drawHeldBoomerang(px, py, angle, playerR, zoom, color) {
   drawBoomerang(bx, by, boomSize / zoom, angle + Math.PI * 0.25, zoom, color);
 }
 
-function drawHearts(px, py, r, hp, maxHp) {
+const REGEN_MS = 20000;
+function drawHearts(px, py, r, hp, maxHp, hitTime) {
   const heartSize = Math.max(6, r * 0.22);
   const spacing = heartSize * 1.3;
   const totalW = maxHp * spacing - (spacing - heartSize);
@@ -675,6 +682,25 @@ function drawHearts(px, py, r, hp, maxHp) {
   for (let i = 0; i < maxHp; i++) {
     const hx = startX + i * spacing + heartSize * 0.5;
     drawHeart(hx, y, heartSize * 0.5, i < hp);
+  }
+  if (hp < maxHp && hp > 0 && hitTime) {
+    const elapsed = Date.now() - hitTime;
+    const progress = Math.min(1, elapsed / REGEN_MS);
+    if (progress > 0 && progress < 1) {
+      const nextIdx = hp;
+      const hx = startX + nextIdx * spacing + heartSize * 0.5;
+      const hs = heartSize * 0.5;
+      ctx.save(); ctx.translate(hx, y); ctx.globalAlpha = 0.3 + progress * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(0, hs * 0.35);
+      ctx.bezierCurveTo(-hs, -hs * 0.3, -hs * 0.5, -hs, 0, -hs * 0.4);
+      ctx.bezierCurveTo(hs * 0.5, -hs, hs, -hs * 0.3, 0, hs * 0.35);
+      ctx.closePath(); ctx.clip();
+      const fillH = hs * 1.4 * progress;
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(-hs, hs * 0.35 - fillH, hs * 2, fillH);
+      ctx.restore();
+    }
   }
 }
 
@@ -747,7 +773,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
   ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.stroke();
 
   drawEyes(px, py, r, fa);
-  drawHearts(px, py, r, player.hp, player.maxHp);
+  drawHearts(px, py, r, player.hp, player.maxHp, player.hitTime);
 
   const coins = player.coins ?? 0;
   if (coins > 0) {
@@ -932,7 +958,21 @@ function detectHitsAndDeaths() {
 
 function tick() {
   requestAnimationFrame(tick);
-  if (!gameStarted) return;
+
+  if (!gameStarted) {
+    const now = performance.now();
+    const dt = Math.min((now - bgSimLastTime) / 1000, 0.05);
+    bgSimLastTime = now;
+    bgSim.step(dt);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const grd = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.7);
+    grd.addColorStop(0, "#1a1a2e"); grd.addColorStop(1, "#0f0f1a");
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 0.6;
+    bgSim.draw(ctx, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+    return;
+  }
 
   const now = performance.now();
   const dt = Math.min((now - lastTime) / 1000, 0.1);

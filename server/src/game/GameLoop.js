@@ -402,6 +402,20 @@ export class GameLoop {
     }
   }
 
+  regenHp() {
+    const REGEN_INTERVAL_MS = 20000;
+    const now = Date.now();
+    for (const player of this.state.players.values()) {
+      if (player.dead) continue;
+      if (player.hp >= player.maxHp) continue;
+      const lastHit = player.hitTime || 0;
+      if (now - lastHit >= REGEN_INTERVAL_MS) {
+        player.hp = Math.min(player.maxHp, player.hp + 1);
+        player.hitTime = now;
+      }
+    }
+  }
+
   collectCoins() {
     const PICKUP_RADIUS = 1.5;
     for (const player of this.state.players.values()) {
@@ -429,6 +443,7 @@ export class GameLoop {
     this.processShots();
     this.moveSpears(dt);
     this.boomerangHitPlayers();
+    this.regenHp();
     this.collectCoins();
     this.consumeFood();
     this.decayMass(dt);
