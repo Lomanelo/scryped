@@ -134,13 +134,14 @@ export async function setUserBalance(uid, amountSol) {
   await db.collection("users").doc(uid).update({ balanceSol: amountSol });
 }
 
-export async function recordWithdrawal(uid, amountSol, walletAddress) {
+export async function recordWithdrawal(uid, amountSol, walletAddress, txSignature) {
   if (!db) return null;
   const ref = await db.collection("withdrawals").add({
     uid,
     amountSol,
     walletAddress,
-    status: "pending",
+    txSignature: txSignature || null,
+    status: txSignature ? "completed" : "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
   return ref.id;

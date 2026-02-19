@@ -3,7 +3,7 @@ import { createInitialPlayer } from "../game/GameLoop.js";
 import {
   getPlayerBalance, creditPlayerSol, debitPlayerSol, creditPayoutSol, calculateCashout,
   getEntryFeeUsd, getEntryFeeSol, getSolPrice, getHouseFee,
-  verifyDeposit, scanDepositsFrom
+  verifyDeposit, scanDepositsFrom, sendSolFromHouse
 } from "../wallet/walletManager.js";
 import {
   isFirebaseEnabled, verifyToken, getOrCreateUser,
@@ -251,8 +251,19 @@ export function attachSocketServer(io, gameLoop, state, config) {
           return socket.emit("withdraw:error", { message: "Failed to debit balance" });
         }
 
-        const withdrawId = await recordWithdrawal(uid, amountSol, walletAddress);
-        console.log(`[withdraw] ${uid} requested ${amountSol.toFixed(6)} SOL to ${walletAddress} (id: ${withdrawId})`);
+        let txSignature = null;
+        try {
+          txSignature = await sendSolFromHouse(connection, walletAddress, amountSol);
+        } catch (sendErr) {
+          console.error("[withdraw] On-chain transfer failed:", sendErr.message);
+          await creditPlayerSol(uid, amountSol);
+          return socket.emit("withdraw:error", {
+            message: "Transfer failed — balance restored. " + sendErr.message
+          });
+        }
+
+        const withdrawId = await recordWithdrawal(uid, amountSol, walletAddress, txSignature);
+        console.log(`[withdraw] ${uid} sent ${amountSol.toFixed(6)} SOL to ${walletAddress} — tx: ${txSignature} (id: ${withdrawId})`);
 
         const newBal = await getPlayerBalance(uid);
         const solPrice = await getSolPrice();
@@ -260,6 +271,7 @@ export function attachSocketServer(io, gameLoop, state, config) {
           amountSol,
           walletAddress,
           withdrawId,
+          txSignature,
           balanceSol: newBal.balanceSol,
           solPrice
         });

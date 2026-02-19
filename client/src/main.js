@@ -451,13 +451,17 @@ withdrawConfirmBtn?.addEventListener("click", async () => {
 });
 
 socketClient.on("withdraw:success", (data) => {
-  withdrawStatus.textContent = `Withdrawal of ${data.amountSol.toFixed(4)} SOL queued. You'll receive it shortly.`;
+  if (data.txSignature) {
+    withdrawStatus.innerHTML = `Sent ${data.amountSol.toFixed(4)} SOL! <a href="https://solscan.io/tx/${data.txSignature}" target="_blank" rel="noopener" style="color:#ffd700;text-decoration:underline;">View tx</a>`;
+  } else {
+    withdrawStatus.textContent = `Withdrawal of ${data.amountSol.toFixed(4)} SOL submitted.`;
+  }
   withdrawStatus.style.color = "#7cf7b2";
   withdrawConfirmBtn.textContent = "Done";
   balanceSol = data.balanceSol ?? 0;
   if (data.solPrice) solPrice = data.solPrice;
   updateBalanceDisplay();
-  setTimeout(() => { withdrawModal.style.display = "none"; }, 3000);
+  setTimeout(() => { withdrawModal.style.display = "none"; }, 4000);
 });
 
 socketClient.on("withdraw:error", (data) => {

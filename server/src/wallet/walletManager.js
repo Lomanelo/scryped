@@ -1,4 +1,8 @@
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  Connection, PublicKey, Keypair, Transaction,
+  SystemProgram, LAMPORTS_PER_SOL, sendAndConfirmTransaction
+} from "@solana/web3.js";
+import bs58 from "bs58";
 import {
   isFirebaseEnabled, getUserBalance, creditUserSol,
   debitUserSol, creditUserPayoutSol,
@@ -42,6 +46,46 @@ export async function getSolPrice() {
 export async function getEntryFeeSol() {
   const price = await getSolPrice();
   return ENTRY_FEE_USD / price;
+}
+
+let houseKeypair = null;
+function getHouseKeypair() {
+  if (houseKeypair) return houseKeypair;
+  const privKey = process.env.HOUSE_WALLET_PRIVATE_KEY;
+  if (!privKey) return null;
+  try {
+    const decoded = bs58.decode(privKey.trim());
+    houseKeypair = Keypair.fromSecretKey(decoded);
+    console.log("[wallet] House keypair loaded:", houseKeypair.publicKey.toBase58());
+    return houseKeypair;
+  } catch (err) {
+    console.error("[wallet] Failed to load house keypair:", err.message);
+    return null;
+  }
+}
+
+export async function sendSolFromHouse(connection, recipientAddress, amountSol) {
+  const kp = getHouseKeypair();
+  if (!kp) throw new Error("House wallet private key not configured");
+
+  const recipient = new PublicKey(recipientAddress);
+  const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+
+  const tx = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: kp.publicKey,
+      toPubkey: recipient,
+      lamports
+    })
+  );
+
+  const signature = await sendAndConfirmTransaction(connection, tx, [kp], {
+    commitment: "confirmed",
+    maxRetries: 3
+  });
+
+  console.log(`[wallet] Sent ${amountSol.toFixed(6)} SOL to ${recipientAddress} — tx: ${signature}`);
+  return signature;
 }
 
 export async function getPlayerBalance(uid) {
