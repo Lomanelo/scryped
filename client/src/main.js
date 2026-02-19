@@ -245,9 +245,6 @@ function updateJoinBtn() {
 document.getElementById("refreshBalBtn").addEventListener("click", () => {
   if (isAuthenticated) {
     socketClient.refreshBalance();
-    if (userWalletAddress) {
-      socketClient.checkDeposits(userWalletAddress);
-    }
   }
 });
 

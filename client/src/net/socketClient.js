@@ -23,6 +23,7 @@ export function createSocketClient() {
   function connect() {
     if (socket) return;
     socket = window.io();
+    window.__socket = socket;
 
     socket.on(EVENTS.CONNECTED, (payload) => {
       playerId = payload.playerId;

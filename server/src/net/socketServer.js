@@ -222,28 +222,10 @@ export function attachSocketServer(io, gameLoop, state, config) {
     socket.on("wallet:check_deposits", async (data) => {
       const user = getSocketUser(socket.id);
       const uid = user?.uid;
-      const walletAddress = data?.walletAddress || user?.walletAddress;
-      if (!walletAddress || !uid) return;
-
-      const deposits = await scanDepositsFrom(connection, walletAddress, HOUSE_WALLET, uid);
-      if (deposits.length > 0) {
-        let totalSol = 0;
-        for (const dep of deposits) {
-          const sol = dep.lamports / LAMPORTS_PER_SOL;
-          await creditPlayerSol(uid, sol);
-          totalSol += sol;
-        }
-        const bal = await getPlayerBalance(uid);
-        const solPrice = await getSolPrice();
-        socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress });
-        if (totalSol > 0) {
-          socket.emit("wallet:deposit_success", { amountSol: totalSol, amountUsd: totalSol * solPrice });
-        }
-      } else {
-        const bal = await getPlayerBalance(uid);
-        const solPrice = await getSolPrice();
-        socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress });
-      }
+      if (!uid) return;
+      const bal = await getPlayerBalance(uid);
+      const solPrice = await getSolPrice();
+      socket.emit("wallet:balance", { balanceSol: bal.balanceSol, solPrice, walletAddress: user.walletAddress });
     });
 
     socket.on("wallet:join_game", async (data) => {
