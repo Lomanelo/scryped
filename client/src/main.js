@@ -26,28 +26,28 @@ let bgSimLastTime = performance.now();
 let lightMode = localStorage.getItem("scryped_theme") === "light";
 const THEME = {
   get dark() { return !lightMode; },
-  get bgGrad1() { return lightMode ? "#dce1ea" : "#141e30"; },
-  get bgGrad2() { return lightMode ? "#c8cfd8" : "#0a0f1a"; },
-  get dotColor() { return lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.06)"; },
-  get crossColor() { return lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.035)"; },
-  get borderColor() { return lightMode ? "rgba(180,30,30,0.5)" : "rgba(255,80,80,0.3)"; },
-  get borderGlow() { return lightMode ? "rgba(180,30,30,0.12)" : "rgba(255,80,80,0.06)"; },
-  get minimapBg() { return lightMode ? "rgba(255,255,255,0.82)" : "rgba(10,15,26,0.75)"; },
-  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)"; },
-  get hudBg() { return lightMode ? "rgba(255,255,255,0.82)" : "rgba(8,12,22,0.65)"; },
-  get hudBorder() { return lightMode ? "rgba(60,80,120,0.3)" : "rgba(120,160,255,0.18)"; },
+  get bgGrad1() { return lightMode ? "#b0b8c8" : "#141e30"; },
+  get bgGrad2() { return lightMode ? "#949dae" : "#0a0f1a"; },
+  get dotColor() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)"; },
+  get crossColor() { return lightMode ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.035)"; },
+  get borderColor() { return lightMode ? "rgba(160,20,20,0.45)" : "rgba(255,80,80,0.3)"; },
+  get borderGlow() { return lightMode ? "rgba(160,20,20,0.1)" : "rgba(255,80,80,0.06)"; },
+  get minimapBg() { return lightMode ? "rgba(200,208,220,0.85)" : "rgba(10,15,26,0.75)"; },
+  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"; },
+  get hudBg() { return lightMode ? "rgba(200,208,220,0.8)" : "rgba(8,12,22,0.65)"; },
+  get hudBorder() { return lightMode ? "rgba(50,65,100,0.25)" : "rgba(120,160,255,0.18)"; },
   get textColor() { return lightMode ? "#111820" : "#fff"; },
   get textDim() { return lightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.4)"; },
-  get feedBg() { return lightMode ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.4)"; },
+  get feedBg() { return lightMode ? "rgba(180,190,205,0.8)" : "rgba(0,0,0,0.4)"; },
   get feedText() { return lightMode ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.6)"; },
   get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.3)"; },
   get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)"; },
   get coinBadgeBg() { return lightMode ? "rgba(40,35,20,0.6)" : "rgba(0,0,0,0.55)"; },
   get coinText() { return lightMode ? "#ffe040" : "#ffd700"; },
-  get eyeWhite() { return lightMode ? "#f0f0f0" : "#ffffff"; },
+  get eyeWhite() { return lightMode ? "#e0e4ea" : "#ffffff"; },
   get eyeStroke() { return lightMode ? "rgba(0,0,0,0.25)" : "none"; },
-  get menuBgGrad1() { return lightMode ? "rgba(210,215,230,0.92)" : "rgba(26,37,64,0.82)"; },
-  get menuBgGrad2() { return lightMode ? "rgba(190,198,215,0.95)" : "rgba(10,15,26,0.88)"; },
+  get menuBgGrad1() { return lightMode ? "rgba(160,170,190,0.92)" : "rgba(26,37,64,0.82)"; },
+  get menuBgGrad2() { return lightMode ? "rgba(135,145,165,0.95)" : "rgba(10,15,26,0.88)"; },
 };
 
 let balanceSol = 0;
@@ -396,7 +396,7 @@ function applyTheme() {
   const ss = document.getElementById("startScreen");
   if (ss) {
     ss.style.background = lightMode
-      ? "radial-gradient(ellipse at 50% 30%, rgba(210,215,230,0.94) 0%, rgba(190,198,215,0.97) 70%)"
+      ? "radial-gradient(ellipse at 50% 30%, rgba(155,165,185,0.94) 0%, rgba(130,140,160,0.97) 70%)"
       : "radial-gradient(ellipse at 50% 30%, rgba(26,37,64,0.82) 0%, rgba(10,15,26,0.88) 70%)";
     ss.style.color = lightMode ? "#111820" : "#fff";
   }
@@ -1041,7 +1041,7 @@ function drawDashCooldownIndicator(px, py, r) {
   const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
   const indicatorR = Math.max(8, r * 0.3);
   const ix = px + r + indicatorR + 6, iy = py;
-  ctx.globalAlpha = 0.5; ctx.fillStyle = lightMode ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.5)";
+  ctx.globalAlpha = 0.5; ctx.fillStyle = lightMode ? "rgba(180,190,205,0.8)" : "rgba(0,0,0,0.5)";
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 0.8; ctx.strokeStyle = lightMode ? "#1a8aaa" : "#7af0ff"; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR - 2, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress); ctx.stroke();
