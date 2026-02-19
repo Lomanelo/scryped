@@ -124,7 +124,7 @@ socketClient.on("auth:success", (data) => {
   if (data.solPrice) solPrice = data.solPrice;
   if (data.walletAddress) {
     userWalletAddress = data.walletAddress;
-    walletInput.value = data.walletAddress;
+    if (walletInput) walletInput.value = data.walletAddress;
   }
   updateBalanceDisplay();
 });
@@ -159,7 +159,7 @@ signOutBtn.addEventListener("click", async () => {
   solPrice = 0;
   walletBalEl.textContent = "0.0000 SOL";
   walletBalUsd.textContent = "";
-  walletInput.value = "";
+  if (walletInput) walletInput.value = "";
   authSignedOut.style.display = "";
   authSignedIn.style.display = "none";
   authStatus.textContent = "";
@@ -243,20 +243,18 @@ function saveWalletAddress(addr) {
   updateJoinBtn();
 }
 
-walletInput.addEventListener("change", () => {
-  const addr = walletInput.value.trim();
-  if (addr.length >= 32 && addr.length <= 44) {
-    saveWalletAddress(addr);
-  }
-});
-walletInput.addEventListener("paste", () => {
-  setTimeout(() => {
+if (walletInput) {
+  walletInput.addEventListener("change", () => {
     const addr = walletInput.value.trim();
-    if (addr.length >= 32 && addr.length <= 44) {
-      saveWalletAddress(addr);
-    }
-  }, 50);
-});
+    if (addr.length >= 32 && addr.length <= 44) saveWalletAddress(addr);
+  });
+  walletInput.addEventListener("paste", () => {
+    setTimeout(() => {
+      const addr = walletInput.value.trim();
+      if (addr.length >= 32 && addr.length <= 44) saveWalletAddress(addr);
+    }, 50);
+  });
+}
 
 function updateJoinBtn() {
   const hasName = nameInput.value.trim().length > 0;
@@ -443,9 +441,10 @@ withdrawConfirmBtn?.addEventListener("click", async () => {
     withdrawStatus.style.color = "#ff6b6b";
     return;
   }
+  saveWalletAddress(addr);
   withdrawConfirmBtn.disabled = true;
   withdrawConfirmBtn.textContent = "Processing...";
-  withdrawStatus.textContent = "Submitting withdrawal request...";
+  withdrawStatus.textContent = "Sending SOL to your wallet...";
   withdrawStatus.style.color = "rgba(255,255,255,0.5)";
   socketClient.withdraw(addr);
 });
