@@ -43,7 +43,7 @@ const THEME = {
   get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.3)"; },
   get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)"; },
   get coinBadgeBg() { return lightMode ? "rgba(40,35,20,0.6)" : "rgba(0,0,0,0.55)"; },
-  get coinText() { return lightMode ? "#ffe040" : "#ffd700"; },
+  get coinText() { return lightMode ? "#fff0a0" : "#ffd700"; },
   get eyeWhite() { return lightMode ? "#e0e4ea" : "#ffffff"; },
   get eyeStroke() { return lightMode ? "rgba(0,0,0,0.25)" : "none"; },
   get menuBgGrad1() { return lightMode ? "rgba(160,170,190,0.92)" : "rgba(26,37,64,0.82)"; },
@@ -892,7 +892,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     ctx.arc(px, py, badgeR, 0, Math.PI * 2);
     ctx.fillStyle = THEME.coinBadgeBg;
     ctx.fill();
-    ctx.strokeStyle = lightMode ? "#c8a000" : "#ffd700";
+    ctx.strokeStyle = lightMode ? "#8a6d00" : "#ffd700";
     ctx.lineWidth = Math.max(1.5, badgeR * 0.12);
     ctx.stroke();
 
@@ -1143,15 +1143,15 @@ function drawBottomHud() {
   const boomR = 10;
   const boomReady = localHasSpear;
   ctx.beginPath(); ctx.arc(boomX + boomR, hsy, boomR, 0, Math.PI * 2);
-  ctx.fillStyle = boomReady ? (lightMode ? "rgba(200,160,30,0.25)" : "rgba(245,197,66,0.2)") : (lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.04)");
+  ctx.fillStyle = boomReady ? (lightMode ? "rgba(100,80,0,0.2)" : "rgba(245,197,66,0.2)") : (lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.04)");
   ctx.fill();
-  ctx.strokeStyle = boomReady ? (lightMode ? "#b08a10" : "#f5c542") : (lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.12)");
+  ctx.strokeStyle = boomReady ? (lightMode ? "#6b5500" : "#f5c542") : (lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.12)");
   ctx.lineWidth = 1.5; ctx.stroke();
 
   if (boomReady) {
     const s = boomR * 0.5, aw = s * 0.22, cx = boomX + boomR, cy = hsy;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI * 0.25);
-    ctx.fillStyle = "#f5c542"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1;
+    ctx.fillStyle = lightMode ? "#8a6d00" : "#f5c542"; ctx.strokeStyle = lightMode ? "#3a2e00" : "#111"; ctx.lineWidth = 1;
     ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(0, aw); ctx.lineTo(s, -s * 0.5 + aw);
@@ -1353,22 +1353,23 @@ function tick() {
     const ringWidth = Math.max(4, r * 0.12);
 
     ctx.save();
+    const cashGold = lightMode ? "#6b5500" : "#ffd700";
     ctx.globalAlpha = 0.25;
-    ctx.strokeStyle = "#ffd700";
+    ctx.strokeStyle = cashGold;
     ctx.lineWidth = ringWidth;
     ctx.beginPath();
     ctx.arc(p.x, p.y, ringR, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = "#ffd700";
+    ctx.strokeStyle = cashGold;
     ctx.lineWidth = ringWidth;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.arc(p.x, p.y, ringR, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress);
     ctx.stroke();
 
-    ctx.shadowColor = "#ffd700";
+    ctx.shadowColor = cashGold;
     ctx.shadowBlur = 12;
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
@@ -1381,7 +1382,7 @@ function tick() {
     ctx.font = "bold 13px Inter, Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "#ffd700";
+    ctx.fillStyle = cashGold;
     ctx.fillText(`Cash out $${payout.toFixed(2)}`, p.x, labelY);
 
     ctx.globalAlpha = 1;
