@@ -12,11 +12,15 @@ let app = null;
 let db = null;
 
 if (projectId && clientEmail && privateKey) {
-  app = admin.initializeApp({
-    credential: admin.credential.cert({ projectId, clientEmail, privateKey })
-  });
-  db = admin.firestore();
-  console.log("[firebase] Admin SDK initialized");
+  try {
+    app = admin.initializeApp({
+      credential: admin.credential.cert({ projectId, clientEmail, privateKey })
+    });
+    db = admin.firestore();
+    console.log("[firebase] Admin SDK initialized");
+  } catch (err) {
+    console.error("[firebase] Failed to initialize:", err.message);
+  }
 }
 
 export function isFirebaseEnabled() {
