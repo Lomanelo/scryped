@@ -158,7 +158,6 @@ socketClient.on("wallet:info", (data) => {
   updateBalanceDisplay();
 });
 socketClient.requestWalletInfo();
-setInterval(() => socketClient.requestWalletInfo(), 60_000);
 
 socketClient.on("wallet:balance", (data) => {
   balanceSol = data.balanceSol;
@@ -245,6 +244,7 @@ function updateJoinBtn() {
 document.getElementById("refreshBalBtn").addEventListener("click", () => {
   if (isAuthenticated) {
     socketClient.refreshBalance();
+    socketClient.requestWalletInfo();
   }
 });
 

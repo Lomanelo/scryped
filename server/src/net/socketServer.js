@@ -229,58 +229,63 @@ export function attachSocketServer(io, gameLoop, state, config) {
     });
 
     socket.on("wallet:join_game", async (data) => {
-      const user = getSocketUser(socket.id);
-      const uid = user?.uid;
-      if (!uid) return socket.emit("wallet:error", { message: "Sign in first" });
+      try {
+        const user = getSocketUser(socket.id);
+        const uid = user?.uid;
+        if (!uid) return socket.emit("wallet:error", { message: "Sign in first" });
 
-      const entryFeeSol = await getEntryFeeSol();
-      const solPrice = await getSolPrice();
-      const bal = await getPlayerBalance(uid);
+        const entryFeeSol = await getEntryFeeSol();
+        const solPrice = await getSolPrice();
+        const bal = await getPlayerBalance(uid);
 
-      if (bal.balanceSol < entryFeeSol - 0.000001) {
-        return socket.emit("wallet:error", { message: `Insufficient balance. Need ~${entryFeeSol.toFixed(4)} SOL ($${(entryFeeSol * solPrice).toFixed(2)})` });
+        if (bal.balanceSol < entryFeeSol - 0.000001) {
+          return socket.emit("wallet:error", { message: `Insufficient balance. Need ~${entryFeeSol.toFixed(4)} SOL ($${(entryFeeSol * solPrice).toFixed(2)})` });
+        }
+
+        if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
+          socket.emit("arena:full");
+          return;
+        }
+
+        const debited = await debitPlayerSol(uid, entryFeeSol);
+        if (!debited) {
+          return socket.emit("wallet:error", { message: "Failed to debit entry fee" });
+        }
+
+        const player = createInitialPlayer({ id: socket.id, isBot: false });
+        const clientName = data?.name;
+        if (clientName && clientName.trim().length > 0) {
+          player.name = clientName.trim().slice(0, 16);
+        } else if (user.displayName) {
+          player.name = user.displayName.slice(0, 16);
+        }
+        const pos = state.randomPosition(player.radius + 3);
+        player.x = pos.x; player.y = pos.y;
+        player.uid = uid;
+        player.walletAddress = user.walletAddress;
+        player.entryFeeSol = entryFeeSol;
+        player.entryFee = 1;
+        state.players.set(socket.id, player);
+
+        const newBal = await getPlayerBalance(uid);
+        socket.emit("wallet:balance", { balanceSol: newBal.balanceSol, solPrice, walletAddress: user.walletAddress });
+
+        socket.emit(EVENTS.CONNECTED, {
+          playerId: socket.id,
+          dummyId: DUMMY_ID,
+          config: {
+            mode: "arena",
+            tickRate: config.tickRate,
+            world: { width: config.worldWidth, height: config.worldHeight }
+          },
+          inGameBalance: player.inGameBalance,
+          entryFee
+        });
+        io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
+      } catch (err) {
+        console.error("[join_game] Error:", err.message);
+        socket.emit("wallet:error", { message: "Failed to join game. Try again." });
       }
-
-      if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
-        socket.emit("arena:full");
-        return;
-      }
-
-      const debited = await debitPlayerSol(uid, entryFeeSol);
-      if (!debited) {
-        return socket.emit("wallet:error", { message: "Failed to debit entry fee" });
-      }
-
-      const player = createInitialPlayer({ id: socket.id, isBot: false });
-      const clientName = data?.name;
-      if (clientName && clientName.trim().length > 0) {
-        player.name = clientName.trim().slice(0, 16);
-      } else if (user.displayName) {
-        player.name = user.displayName.slice(0, 16);
-      }
-      const pos = state.randomPosition(player.radius + 3);
-      player.x = pos.x; player.y = pos.y;
-      player.uid = uid;
-      player.walletAddress = user.walletAddress;
-      player.entryFeeSol = entryFeeSol;
-      player.entryFee = 1;
-      state.players.set(socket.id, player);
-
-      const newBal = await getPlayerBalance(uid);
-      socket.emit("wallet:balance", { balanceSol: newBal.balanceSol, solPrice, walletAddress: user.walletAddress });
-
-      socket.emit(EVENTS.CONNECTED, {
-        playerId: socket.id,
-        dummyId: DUMMY_ID,
-        config: {
-          mode: "arena",
-          tickRate: config.tickRate,
-          world: { width: config.worldWidth, height: config.worldHeight }
-        },
-        inGameBalance: player.inGameBalance,
-        entryFee
-      });
-      io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
     });
 
     socket.on(EVENTS.INPUT, (payload) => {

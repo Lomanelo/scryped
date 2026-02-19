@@ -23,11 +23,17 @@ export async function getSolPrice() {
     return cachedSolPrice;
   }
   try {
-    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd", { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    cachedSolPrice = data.solana.usd;
-    lastPriceFetch = now;
-    return cachedSolPrice;
+    if (data?.solana?.usd) {
+      cachedSolPrice = data.solana.usd;
+      lastPriceFetch = now;
+    }
+    return cachedSolPrice || 150;
   } catch {
     return cachedSolPrice || 150;
   }

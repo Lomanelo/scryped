@@ -227,11 +227,11 @@
       .modal-close:hover { color: #fff; }
 
       .refresh-bal-btn {
-        padding: 4px 10px; font-size: 11px; font-weight: 600; border: none;
-        border-radius: 5px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
-        cursor: pointer; margin-left: 6px; transition: background 0.15s;
+        padding: 2px 7px; font-size: 14px; font-weight: 600; border: none;
+        border-radius: 5px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4);
+        cursor: pointer; transition: background 0.15s, transform 0.3s; line-height: 1;
       }
-      .refresh-bal-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+      .refresh-bal-btn:hover { background: rgba(255,255,255,0.15); color: #fff; transform: rotate(180deg); }
 
       #cashoutResultModal {
         position: fixed; inset: 0; z-index: 200; display: none;
@@ -289,9 +289,9 @@
               </div>
             </div>
 
+            <div class="wallet-balance-sub" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px;">Account Balance <button class="refresh-bal-btn" id="refreshBalBtn">&#x21bb;</button></div>
             <div class="wallet-balance-usd" id="walletBalUsd">$0.00</div>
             <div class="wallet-balance" id="walletBal">0.0000 SOL</div>
-            <div class="wallet-balance-sub">Account Balance <button class="refresh-bal-btn" id="refreshBalBtn">Refresh</button></div>
 
             <div class="wallet-label">Solana address (for deposits)</div>
             <input class="wallet-input" id="walletInput" type="text" placeholder="Paste your Solana address..." autocomplete="off" spellcheck="false" />
