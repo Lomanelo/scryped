@@ -23,6 +23,31 @@ let gameStarted = false;
 const bgSim = createBgSim();
 let bgSimLastTime = performance.now();
 
+let lightMode = localStorage.getItem("scryped_theme") === "light";
+const THEME = {
+  get dark() { return !lightMode; },
+  get bgGrad1() { return lightMode ? "#e8ecf2" : "#141e30"; },
+  get bgGrad2() { return lightMode ? "#d0d6e0" : "#0a0f1a"; },
+  get dotColor() { return lightMode ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.06)"; },
+  get crossColor() { return lightMode ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.035)"; },
+  get borderColor() { return lightMode ? "rgba(200,40,40,0.35)" : "rgba(255,80,80,0.3)"; },
+  get borderGlow() { return lightMode ? "rgba(200,40,40,0.08)" : "rgba(255,80,80,0.06)"; },
+  get minimapBg() { return lightMode ? "rgba(220,225,235,0.85)" : "rgba(10,15,26,0.75)"; },
+  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.2)"; },
+  get hudBg() { return lightMode ? "rgba(240,243,248,0.75)" : "rgba(8,12,22,0.65)"; },
+  get hudBorder() { return lightMode ? "rgba(100,120,160,0.2)" : "rgba(120,160,255,0.18)"; },
+  get textColor() { return lightMode ? "#1a2030" : "#fff"; },
+  get textDim() { return lightMode ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)"; },
+  get feedBg() { return lightMode ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)"; },
+  get feedText() { return lightMode ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)"; },
+  get playerStroke() { return lightMode ? -0.2 : -0.3; },
+  get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.3)"; },
+  get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.15)"; },
+  get coinBadgeBg() { return lightMode ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)"; },
+  get menuBgGrad1() { return lightMode ? "rgba(220,225,240,0.85)" : "rgba(26,37,64,0.82)"; },
+  get menuBgGrad2() { return lightMode ? "rgba(200,208,225,0.9)" : "rgba(10,15,26,0.88)"; },
+};
+
 let balanceSol = 0;
 let solPrice = 0;
 let walletInfo = null;
@@ -365,6 +390,30 @@ const withdrawWalletInput = document.getElementById("withdrawWalletInput");
 const withdrawStatus = document.getElementById("withdrawStatus");
 const withdrawConfirmBtn = document.getElementById("withdrawConfirmBtn");
 
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+function applyTheme() {
+  document.body.classList.toggle("light-theme", lightMode);
+  const ss = document.getElementById("startScreen");
+  if (ss) {
+    ss.style.background = lightMode
+      ? "radial-gradient(ellipse at 50% 30%, rgba(220,225,240,0.92) 0%, rgba(200,208,225,0.95) 70%)"
+      : "radial-gradient(ellipse at 50% 30%, rgba(26,37,64,0.82) 0%, rgba(10,15,26,0.88) 70%)";
+    ss.style.color = lightMode ? "#1a2030" : "#fff";
+  }
+  if (themeToggleBtn) {
+    themeToggleBtn.innerHTML = lightMode ? "&#9728;" : "&#9789;";
+    themeToggleBtn.style.background = lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)";
+    themeToggleBtn.style.borderColor = lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.15)";
+    themeToggleBtn.style.color = lightMode ? "#1a2030" : "#fff";
+  }
+}
+applyTheme();
+themeToggleBtn?.addEventListener("click", () => {
+  lightMode = !lightMode;
+  localStorage.setItem("scryped_theme", lightMode ? "light" : "dark");
+  applyTheme();
+});
+
 document.getElementById("cashOutBtn")?.addEventListener("click", () => {
   if (!isAuthenticated) return;
   withdrawBalDisplay.textContent = `${balanceSol.toFixed(4)} SOL`;
@@ -462,6 +511,11 @@ const deathParticles = [];
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyC" && !e.repeat) showRangeCircle = !showRangeCircle;
+  if (e.code === "KeyL" && !e.repeat) {
+    lightMode = !lightMode;
+    localStorage.setItem("scryped_theme", lightMode ? "light" : "dark");
+    applyTheme();
+  }
 });
 
 const killFeed = [];
@@ -561,7 +615,7 @@ function worldToScreen(x, y, cameraX, cameraY, zoom) {
 
 function drawBackground(cameraX, cameraY, zoom) {
   const grad = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.5, 0, canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.7);
-  grad.addColorStop(0, "#141e30"); grad.addColorStop(1, "#0a0f1a");
+  grad.addColorStop(0, THEME.bgGrad1); grad.addColorStop(1, THEME.bgGrad2);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const cell = 40;
@@ -572,7 +626,7 @@ function drawBackground(cameraX, cameraY, zoom) {
   const endY = Math.ceil((cameraY + viewH * 0.5) / cell) * cell;
 
   const dotR = Math.max(1.2, 1.5 * zoom);
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillStyle = THEME.dotColor;
   for (let x = startX; x <= endX; x += cell) {
     for (let y = startY; y <= endY; y += cell) {
       const sx = (x - cameraX) * zoom + canvas.width * 0.5;
@@ -582,7 +636,7 @@ function drawBackground(cameraX, cameraY, zoom) {
   }
 
   const crossSize = Math.max(3, 4 * zoom);
-  ctx.strokeStyle = "rgba(255,255,255,0.035)"; ctx.lineWidth = 1;
+  ctx.strokeStyle = THEME.crossColor; ctx.lineWidth = 1;
   for (let x = startX; x <= endX; x += cell * 3) {
     for (let y = startY; y <= endY; y += cell * 3) {
       const sx = (x - cameraX) * zoom + canvas.width * 0.5;
@@ -600,13 +654,13 @@ function drawWorldBorder(cameraX, cameraY, zoom) {
   const w = br.x - tl.x, h = br.y - tl.y;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(255,80,80,0.3)";
+  ctx.strokeStyle = THEME.borderColor;
   ctx.lineWidth = 3;
   ctx.setLineDash([16, 10]);
   ctx.strokeRect(tl.x, tl.y, w, h);
   ctx.setLineDash([]);
 
-  ctx.strokeStyle = "rgba(255,80,80,0.06)";
+  ctx.strokeStyle = THEME.borderGlow;
   ctx.lineWidth = 12;
   ctx.strokeRect(tl.x, tl.y, w, h);
   ctx.restore();
@@ -620,8 +674,8 @@ function drawMinimap() {
 
   ctx.save();
 
-  ctx.fillStyle = "rgba(10, 15, 26, 0.75)";
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.fillStyle = THEME.minimapBg;
+  ctx.strokeStyle = THEME.minimapBorder;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(mx, my, SIZE, SIZE, 6);
@@ -762,7 +816,7 @@ function drawHeart(cx, cy, size, filled) {
   ctx.bezierCurveTo(size * 0.5, -size, size, -size * 0.3, 0, size * 0.35);
   ctx.closePath();
   if (filled) { ctx.fillStyle = "#ef4444"; ctx.fill(); ctx.strokeStyle = "#991b1b"; }
-  else { ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.15)"; }
+  else { ctx.fillStyle = THEME.emptyHeartFill; ctx.fill(); ctx.strokeStyle = THEME.emptyHeartStroke; }
   ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
 }
 
@@ -830,7 +884,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     const badgeR = Math.max(7, r * 0.3);
     ctx.beginPath();
     ctx.arc(px, py, badgeR, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillStyle = THEME.coinBadgeBg;
     ctx.fill();
     ctx.strokeStyle = "#ffd700";
     ctx.lineWidth = Math.max(1.5, badgeR * 0.12);
@@ -961,11 +1015,11 @@ function drawKillFeed(dt) {
     ctx.globalAlpha = alpha * 0.9; ctx.font = "bold 13px Inter, Arial";
     const text = `${entry.killer}  eliminated  ${entry.victim}`;
     const measured = ctx.measureText(text);
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillStyle = THEME.feedBg;
     ctx.beginPath(); ctx.roundRect(x - measured.width - 16, y - 12, measured.width + 16, 24, 6); ctx.fill();
-    ctx.fillStyle = entry.killerColor || "#fff";
+    ctx.fillStyle = entry.killerColor || THEME.textColor;
     ctx.fillText(entry.killer, x - ctx.measureText(`  eliminated  ${entry.victim}`).width, y);
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillStyle = THEME.feedText;
     ctx.fillText(`  eliminated  `, x - ctx.measureText(entry.victim).width, y);
     ctx.fillStyle = entry.victimColor || "#ff7a7a";
     ctx.fillText(entry.victim, x, y);
@@ -997,8 +1051,8 @@ function drawBottomHud() {
   const bx = (W - barW) * 0.5, by = H - barH - 16;
 
   ctx.save();
-  ctx.fillStyle = "rgba(8,12,22,0.65)";
-  ctx.strokeStyle = "rgba(120,160,255,0.18)";
+  ctx.fillStyle = THEME.hudBg;
+  ctx.strokeStyle = THEME.hudBorder;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(bx, by, barW, barH, 14);
@@ -1026,8 +1080,8 @@ function drawBottomHud() {
       ctx.fillStyle = "#ef4444"; ctx.fill();
       ctx.strokeStyle = "#991b1b"; ctx.lineWidth = 1; ctx.stroke();
     } else {
-      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = lightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)"; ctx.fill();
+      ctx.strokeStyle = lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
 
       if (i === localHp && localHp > 0 && localHitTime) {
         const elapsed = now - localHitTime;
@@ -1051,7 +1105,7 @@ function drawBottomHud() {
 
   const secLeft = localHitTime && localHp < localMaxHp ? Math.max(0, Math.ceil((REGEN_CD - (now - localHitTime)) / 1000)) : 0;
   if (secLeft > 0 && secLeft <= 20) {
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(`${secLeft}s`, hsx + heartsW + 2, hsy);
@@ -1064,7 +1118,7 @@ function drawBottomHud() {
   const dashBarW = 60, dashBarH = 8;
   const dashBarY = hsy - dashBarH * 0.5;
 
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
   ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW, dashBarH, 4); ctx.fill();
 
   if (dashReady) {
@@ -1083,9 +1137,9 @@ function drawBottomHud() {
   const boomR = 10;
   const boomReady = localHasSpear;
   ctx.beginPath(); ctx.arc(boomX + boomR, hsy, boomR, 0, Math.PI * 2);
-  ctx.fillStyle = boomReady ? "rgba(245,197,66,0.2)" : "rgba(255,255,255,0.04)";
+  ctx.fillStyle = boomReady ? "rgba(245,197,66,0.2)" : (lightMode ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.04)");
   ctx.fill();
-  ctx.strokeStyle = boomReady ? "#f5c542" : "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = boomReady ? "#f5c542" : (lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)");
   ctx.lineWidth = 1.5; ctx.stroke();
 
   if (boomReady) {
@@ -1100,11 +1154,17 @@ function drawBottomHud() {
     ctx.lineTo(-aw, 0); ctx.lineTo(0, aw); ctx.closePath();
     ctx.fill(); ctx.stroke(); ctx.restore();
   } else {
-    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("...", boomX + boomR, hsy);
   }
+
+  const themeIcon = lightMode ? "\u2600" : "\u263D";
+  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.18)";
+  ctx.font = "bold 9px Inter, Arial";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  ctx.fillText(`${themeIcon} L`, bx + barW - 10, by + barH * 0.5);
 
   ctx.restore();
 }
@@ -1134,7 +1194,7 @@ function tick() {
     bgSim.step(dt);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const grd = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.7);
-    grd.addColorStop(0, "#1a1a2e"); grd.addColorStop(1, "#0f0f1a");
+    grd.addColorStop(0, THEME.menuBgGrad1); grd.addColorStop(1, THEME.menuBgGrad2);
     ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 0.6;
     bgSim.draw(ctx, canvas.width, canvas.height);
