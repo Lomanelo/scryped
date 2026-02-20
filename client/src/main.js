@@ -149,13 +149,14 @@ function updateEntryFeeDisplay() {
   document.querySelectorAll("#lobbySelector .fee-badge").forEach(b => {
     const usd = parseInt(b.dataset.usd, 10);
     const sol = solPrice > 0 ? (usd / solPrice).toFixed(4) : "...";
-    b.childNodes[0].textContent = `$${usd} `;
-    const small = document.createElement("span");
-    small.style.cssText = "font-size:10px;font-weight:600;opacity:0.6;";
-    small.textContent = `~${sol} SOL`;
-    const existing = b.querySelector("span:not(.player-count)");
-    if (existing) existing.remove();
-    b.insertBefore(small, b.querySelector(".player-count"));
+    let solSpan = b.querySelector(".sol-amount");
+    if (!solSpan) {
+      solSpan = document.createElement("span");
+      solSpan.className = "sol-amount";
+      solSpan.style.cssText = "display:block;font-size:10px;font-weight:600;opacity:0.6;margin-top:1px;";
+      b.insertBefore(solSpan, b.querySelector(".player-count"));
+    }
+    solSpan.textContent = `~${sol} SOL`;
   });
   document.getElementById("entryInfo").textContent = `Entry: $${entryFeeUsd.toFixed(2)} \u00b7 15% fee on profits`;
 }

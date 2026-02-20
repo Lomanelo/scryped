@@ -415,6 +415,7 @@ export function attachSocketServer(io, lobbies, config) {
       });
 
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });
+      io.emit("lobby:counts", getLobbyPlayerCounts(lobbies));
     });
 
     socket.on("disconnect", () => {
