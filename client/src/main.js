@@ -27,6 +27,7 @@ let bgSimLastTime = performance.now();
 let balanceSol = 0;
 let solPrice = 0;
 let walletInfo = null;
+let selectedLobbyUsd = 1;
 let entryFeeUsd = 1;
 let entryFeeSol = 0;
 let userWalletAddress = "";
@@ -141,10 +142,21 @@ signOutBtn.addEventListener("click", async () => {
 });
 
 function updateEntryFeeDisplay() {
+  entryFeeUsd = selectedLobbyUsd;
   if (solPrice > 0) {
     entryFeeSol = entryFeeUsd / solPrice;
   }
-  document.getElementById("entryFeeBadge").textContent = `$${entryFeeUsd.toFixed(0)} (~${entryFeeSol.toFixed(4)} SOL)`;
+  document.querySelectorAll("#lobbySelector .fee-badge").forEach(b => {
+    const usd = parseInt(b.dataset.usd, 10);
+    const sol = solPrice > 0 ? (usd / solPrice).toFixed(4) : "...";
+    b.childNodes[0].textContent = `$${usd} `;
+    const small = document.createElement("span");
+    small.style.cssText = "font-size:10px;font-weight:600;opacity:0.6;";
+    small.textContent = `~${sol} SOL`;
+    const existing = b.querySelector("span:not(.player-count)");
+    if (existing) existing.remove();
+    b.insertBefore(small, b.querySelector(".player-count"));
+  });
   document.getElementById("entryInfo").textContent = `Entry: $${entryFeeUsd.toFixed(2)} \u00b7 15% fee on profits`;
 }
 
@@ -232,13 +244,34 @@ if (walletInput) {
 
 function updateJoinBtn() {
   const hasName = nameInput.value.trim().length > 0;
-  const hasEnough = entryFeeSol > 0 ? balanceSol >= entryFeeSol - 0.000001 : balanceSol * solPrice >= entryFeeUsd;
+  const neededSol = solPrice > 0 ? selectedLobbyUsd / solPrice : 0;
+  const hasEnough = neededSol > 0 ? balanceSol >= neededSol - 0.000001 : false;
   if (isAuthenticated && hasEnough && hasName) {
     joinBtn.classList.remove("btn-disabled");
   } else {
     joinBtn.classList.add("btn-disabled");
   }
 }
+
+document.getElementById("lobbySelector").addEventListener("click", (e) => {
+  const badge = e.target.closest(".fee-badge");
+  if (!badge) return;
+  const usd = parseInt(badge.dataset.usd, 10);
+  if (!usd) return;
+  selectedLobbyUsd = usd;
+  entryFeeUsd = usd;
+  document.querySelectorAll("#lobbySelector .fee-badge").forEach(b => b.classList.remove("active"));
+  badge.classList.add("active");
+  updateEntryFeeDisplay();
+  updateJoinBtn();
+});
+
+socketClient.on("lobby:counts", (counts) => {
+  for (const [usd, count] of Object.entries(counts)) {
+    const el = document.getElementById(`count${usd}`);
+    if (el) el.textContent = `${count} player${count !== 1 ? "s" : ""}`;
+  }
+});
 
 document.getElementById("refreshBalBtn").addEventListener("click", () => {
   if (isAuthenticated) {
@@ -423,9 +456,10 @@ socketClient.on("withdraw:error", (data) => {
 joinBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!isAuthenticated || !name) return;
-  const hasEnough = entryFeeSol > 0 ? balanceSol >= entryFeeSol - 0.000001 : balanceSol * solPrice >= entryFeeUsd;
+  const neededSol = solPrice > 0 ? selectedLobbyUsd / solPrice : 0;
+  const hasEnough = neededSol > 0 ? balanceSol >= neededSol - 0.000001 : false;
   if (!hasEnough) return;
-  socketClient.joinGame(name);
+  socketClient.joinGame(name, selectedLobbyUsd);
 });
 nameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") joinBtn.click();
