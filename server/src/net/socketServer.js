@@ -80,8 +80,29 @@ function isRateLimited(player, now, config) {
   return player.inputCount > config.maxInputRatePerSecond;
 }
 
-export function attachSocketServer(io, gameLoop, state, config) {
+const socketLobbyMap = new Map();
+
+function getPlayerLobby(socketId, lobbies) {
+  const usd = socketLobbyMap.get(socketId);
+  if (usd && lobbies[usd]) return lobbies[usd];
+  return null;
+}
+
+function getLobbyPlayerCounts(lobbies) {
+  const counts = {};
+  for (const [usd, lobby] of Object.entries(lobbies)) {
+    counts[usd] = countHumanPlayers(lobby.state);
+  }
+  return counts;
+}
+
+export function attachSocketServer(io, lobbies, config) {
+  setInterval(() => {
+    io.emit("lobby:counts", getLobbyPlayerCounts(lobbies));
+  }, 3000);
+
   io.on("connection", (socket) => {
+    socket.emit("lobby:counts", getLobbyPlayerCounts(lobbies));
 
     socket.on("auth:get_config", () => {
       socket.emit("auth:config", {
@@ -287,15 +308,19 @@ export function attachSocketServer(io, gameLoop, state, config) {
         const uid = user?.uid;
         if (!uid) return socket.emit("wallet:error", { message: "Sign in first" });
 
-        const entryFeeSol = await getEntryFeeSol();
+        const lobbyUsd = data?.lobbyUsd || 1;
+        const lobby = lobbies[lobbyUsd];
+        if (!lobby) return socket.emit("wallet:error", { message: "Invalid lobby" });
+
         const solPrice = await getSolPrice();
+        const entryFeeSol = lobbyUsd / solPrice;
         const bal = await getPlayerBalance(uid);
 
         if (bal.balanceSol < entryFeeSol - 0.000001) {
-          return socket.emit("wallet:error", { message: `Insufficient balance. Need ~${entryFeeSol.toFixed(4)} SOL ($${(entryFeeSol * solPrice).toFixed(2)})` });
+          return socket.emit("wallet:error", { message: `Insufficient balance. Need ~${entryFeeSol.toFixed(4)} SOL ($${lobbyUsd.toFixed(2)})` });
         }
 
-        if (countHumanPlayers(state) >= config.maxPlayersPerArena) {
+        if (countHumanPlayers(lobby.state) >= config.maxPlayersPerArena) {
           socket.emit("arena:full");
           return;
         }
@@ -312,13 +337,15 @@ export function attachSocketServer(io, gameLoop, state, config) {
         } else if (user.displayName) {
           player.name = user.displayName.slice(0, 16);
         }
-        const pos = state.randomPosition(player.radius + 3);
+        const pos = lobby.state.randomPosition(player.radius + 3);
         player.x = pos.x; player.y = pos.y;
         player.uid = uid;
         player.walletAddress = user.walletAddress;
         player.entryFeeSol = entryFeeSol;
-        player.entryFee = 1;
-        state.players.set(socket.id, player);
+        player.entryFee = lobbyUsd;
+        lobby.state.players.set(socket.id, player);
+        socketLobbyMap.set(socket.id, lobbyUsd);
+        socket.join(`lobby:${lobbyUsd}`);
 
         const newBal = await getPlayerBalance(uid);
         socket.emit("wallet:balance", { balanceSol: newBal.balanceSol, solPrice, walletAddress: user.walletAddress });
@@ -332,9 +359,11 @@ export function attachSocketServer(io, gameLoop, state, config) {
             world: { width: config.worldWidth, height: config.worldHeight }
           },
           inGameBalance: player.inGameBalance,
-          entryFee: player.entryFee
+          entryFee: player.entryFee,
+          lobbyUsd
         });
-        io.emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
+        io.to(`lobby:${lobbyUsd}`).emit(EVENTS.PLAYER_JOINED, { playerId: socket.id });
+        io.emit("lobby:counts", getLobbyPlayerCounts(lobbies));
       } catch (err) {
         console.error("[join_game] Error:", err.message);
         socket.emit("wallet:error", { message: "Failed to join game. Try again." });
@@ -342,15 +371,19 @@ export function attachSocketServer(io, gameLoop, state, config) {
     });
 
     socket.on(EVENTS.INPUT, (payload) => {
-      const player = state.players.get(socket.id);
+      const lobby = getPlayerLobby(socket.id, lobbies);
+      if (!lobby) return;
+      const player = lobby.state.players.get(socket.id);
       if (!player) return;
       const now = Date.now();
       if (isRateLimited(player, now, config)) return;
-      gameLoop.ingestInput(player, payload ?? {});
+      lobby.gameLoop.ingestInput(player, payload ?? {});
     });
 
     socket.on("cashout", async () => {
-      const player = state.players.get(socket.id);
+      const lobby = getPlayerLobby(socket.id, lobbies);
+      if (!lobby) return;
+      const player = lobby.state.players.get(socket.id);
       if (!player) return;
       const user = getSocketUser(socket.id);
       const uid = user?.uid;
@@ -366,8 +399,9 @@ export function attachSocketServer(io, gameLoop, state, config) {
       await creditPayoutSol(uid, payoutSol);
       await recordHouseFee(feeSol, uid);
 
-      state.players.delete(socket.id);
-      state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
+      lobby.state.players.delete(socket.id);
+      lobby.state.spears = lobby.state.spears.filter((s) => s.ownerId !== socket.id);
+      socketLobbyMap.delete(socket.id);
 
       const bal = await getPlayerBalance(uid);
       const solPrice = await getSolPrice();
@@ -384,10 +418,15 @@ export function attachSocketServer(io, gameLoop, state, config) {
     });
 
     socket.on("disconnect", () => {
-      state.players.delete(socket.id);
-      state.spears = state.spears.filter((s) => s.ownerId !== socket.id);
+      const lobby = getPlayerLobby(socket.id, lobbies);
+      if (lobby) {
+        lobby.state.players.delete(socket.id);
+        lobby.state.spears = lobby.state.spears.filter((s) => s.ownerId !== socket.id);
+      }
+      socketLobbyMap.delete(socket.id);
       socketUserMap.delete(socket.id);
       io.emit(EVENTS.PLAYER_LEFT, { playerId: socket.id });
+      io.emit("lobby:counts", getLobbyPlayerCounts(lobbies));
     });
   });
 }

@@ -29,14 +29,20 @@ app.get("/", (_req, res) => {
   res.sendFile(path.join(clientDir, "index.html"));
 });
 
-const state = new GameState(GAME_CONFIG);
-const gameLoop = new GameLoop({ io, state, config: GAME_CONFIG });
-attachSocketServer(io, gameLoop, state, GAME_CONFIG);
+const LOBBY_TIERS = [1, 5, 20];
+const lobbies = {};
+for (const usd of LOBBY_TIERS) {
+  const cfg = { ...GAME_CONFIG };
+  const state = new GameState(cfg);
+  const room = `lobby:${usd}`;
+  const gameLoop = new GameLoop({ io, state, config: cfg, room });
+  lobbies[usd] = { state, gameLoop, config: cfg };
+}
+attachSocketServer(io, lobbies, GAME_CONFIG);
 
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 server.on("error", (error) => {
   if (error?.code === "EADDRINUSE") {
-    // eslint-disable-next-line no-console
     console.error(
       `Port ${port} is already in use. Stop the existing server or run with a different port (PowerShell: $env:PORT=3001; npm run dev).`
     );
@@ -46,7 +52,6 @@ server.on("error", (error) => {
 });
 
 server.listen(port, "0.0.0.0", () => {
-  gameLoop.start();
-  // eslint-disable-next-line no-console
-  console.log(`Scryped server running at http://0.0.0.0:${port}`);
+  for (const usd of LOBBY_TIERS) lobbies[usd].gameLoop.start();
+  console.log(`Scryped server running at http://0.0.0.0:${port} — lobbies: $${LOBBY_TIERS.join(", $")}`);
 });

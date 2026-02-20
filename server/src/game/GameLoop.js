@@ -37,10 +37,11 @@ function nextColor() {
 }
 
 export class GameLoop {
-  constructor({ io, state, config }) {
+  constructor({ io, state, config, room }) {
     this.io = io;
     this.state = state;
     this.config = config;
+    this.room = room || null;
     this.tickMs = 1000 / config.tickRate;
     this.snapshotEveryTicks = Math.max(1, Math.round(config.tickRate / config.snapshotRate));
     this.interval = null;
@@ -449,7 +450,12 @@ export class GameLoop {
     this.decayMass(dt);
 
     if (this.state.tick % this.snapshotEveryTicks === 0) {
-      this.io.emit("snapshot", this.state.snapshot());
+      const snap = this.state.snapshot();
+      if (this.room) {
+        this.io.to(this.room).emit("snapshot", snap);
+      } else {
+        this.io.emit("snapshot", snap);
+      }
     }
   }
 }

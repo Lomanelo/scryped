@@ -23,32 +23,6 @@ let gameStarted = false;
 const bgSim = createBgSim();
 let bgSimLastTime = performance.now();
 
-let lightMode = localStorage.getItem("scryped_theme") === "light";
-const THEME = {
-  get dark() { return !lightMode; },
-  get bgGrad1() { return lightMode ? "#b0b8c8" : "#141e30"; },
-  get bgGrad2() { return lightMode ? "#949dae" : "#0a0f1a"; },
-  get dotColor() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)"; },
-  get crossColor() { return lightMode ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.035)"; },
-  get borderColor() { return lightMode ? "rgba(160,20,20,0.45)" : "rgba(255,80,80,0.3)"; },
-  get borderGlow() { return lightMode ? "rgba(160,20,20,0.1)" : "rgba(255,80,80,0.06)"; },
-  get minimapBg() { return lightMode ? "rgba(200,208,220,0.85)" : "rgba(10,15,26,0.75)"; },
-  get minimapBorder() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"; },
-  get hudBg() { return lightMode ? "rgba(200,208,220,0.8)" : "rgba(8,12,22,0.65)"; },
-  get hudBorder() { return lightMode ? "rgba(50,65,100,0.25)" : "rgba(120,160,255,0.18)"; },
-  get textColor() { return lightMode ? "#111820" : "#fff"; },
-  get textDim() { return lightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.4)"; },
-  get feedBg() { return lightMode ? "rgba(180,190,205,0.8)" : "rgba(0,0,0,0.4)"; },
-  get feedText() { return lightMode ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.6)"; },
-  get emptyHeartFill() { return lightMode ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.3)"; },
-  get emptyHeartStroke() { return lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)"; },
-  get coinBadgeBg() { return lightMode ? "rgba(40,35,20,0.6)" : "rgba(0,0,0,0.55)"; },
-  get coinText() { return lightMode ? "#fff0a0" : "#ffd700"; },
-  get eyeWhite() { return lightMode ? "#e0e4ea" : "#ffffff"; },
-  get eyeStroke() { return lightMode ? "rgba(0,0,0,0.25)" : "none"; },
-  get menuBgGrad1() { return lightMode ? "rgba(160,170,190,0.92)" : "rgba(26,37,64,0.82)"; },
-  get menuBgGrad2() { return lightMode ? "rgba(135,145,165,0.95)" : "rgba(10,15,26,0.88)"; },
-};
 
 let balanceSol = 0;
 let solPrice = 0;
@@ -390,30 +364,6 @@ const withdrawWalletInput = document.getElementById("withdrawWalletInput");
 const withdrawStatus = document.getElementById("withdrawStatus");
 const withdrawConfirmBtn = document.getElementById("withdrawConfirmBtn");
 
-const themeToggleBtn = document.getElementById("themeToggleBtn");
-function applyTheme() {
-  document.body.classList.toggle("light-theme", lightMode);
-  const ss = document.getElementById("startScreen");
-  if (ss) {
-    ss.style.background = lightMode
-      ? "radial-gradient(ellipse at 50% 30%, rgba(155,165,185,0.94) 0%, rgba(130,140,160,0.97) 70%)"
-      : "radial-gradient(ellipse at 50% 30%, rgba(26,37,64,0.82) 0%, rgba(10,15,26,0.88) 70%)";
-    ss.style.color = lightMode ? "#111820" : "#fff";
-  }
-  if (themeToggleBtn) {
-    themeToggleBtn.innerHTML = lightMode ? "&#9728;" : "&#9789;";
-    themeToggleBtn.style.background = lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)";
-    themeToggleBtn.style.borderColor = lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.15)";
-    themeToggleBtn.style.color = lightMode ? "#1a2030" : "#fff";
-  }
-}
-applyTheme();
-themeToggleBtn?.addEventListener("click", () => {
-  lightMode = !lightMode;
-  localStorage.setItem("scryped_theme", lightMode ? "light" : "dark");
-  applyTheme();
-});
-
 document.getElementById("cashOutBtn")?.addEventListener("click", () => {
   if (!isAuthenticated) return;
   withdrawBalDisplay.textContent = `${balanceSol.toFixed(4)} SOL`;
@@ -516,11 +466,6 @@ const deathParticles = [];
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyC" && !e.repeat) showRangeCircle = !showRangeCircle;
-  if (e.code === "KeyL" && !e.repeat) {
-    lightMode = !lightMode;
-    localStorage.setItem("scryped_theme", lightMode ? "light" : "dark");
-    applyTheme();
-  }
 });
 
 const killFeed = [];
@@ -620,7 +565,7 @@ function worldToScreen(x, y, cameraX, cameraY, zoom) {
 
 function drawBackground(cameraX, cameraY, zoom) {
   const grad = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.5, 0, canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.7);
-  grad.addColorStop(0, THEME.bgGrad1); grad.addColorStop(1, THEME.bgGrad2);
+  grad.addColorStop(0, "#141e30"); grad.addColorStop(1, "#0a0f1a");
   ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const cell = 40;
@@ -631,7 +576,7 @@ function drawBackground(cameraX, cameraY, zoom) {
   const endY = Math.ceil((cameraY + viewH * 0.5) / cell) * cell;
 
   const dotR = Math.max(1.2, 1.5 * zoom);
-  ctx.fillStyle = THEME.dotColor;
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
   for (let x = startX; x <= endX; x += cell) {
     for (let y = startY; y <= endY; y += cell) {
       const sx = (x - cameraX) * zoom + canvas.width * 0.5;
@@ -641,7 +586,7 @@ function drawBackground(cameraX, cameraY, zoom) {
   }
 
   const crossSize = Math.max(3, 4 * zoom);
-  ctx.strokeStyle = THEME.crossColor; ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.035)"; ctx.lineWidth = 1;
   for (let x = startX; x <= endX; x += cell * 3) {
     for (let y = startY; y <= endY; y += cell * 3) {
       const sx = (x - cameraX) * zoom + canvas.width * 0.5;
@@ -659,13 +604,13 @@ function drawWorldBorder(cameraX, cameraY, zoom) {
   const w = br.x - tl.x, h = br.y - tl.y;
 
   ctx.save();
-  ctx.strokeStyle = THEME.borderColor;
+  ctx.strokeStyle = "rgba(255,80,80,0.3)";
   ctx.lineWidth = 3;
   ctx.setLineDash([16, 10]);
   ctx.strokeRect(tl.x, tl.y, w, h);
   ctx.setLineDash([]);
 
-  ctx.strokeStyle = THEME.borderGlow;
+  ctx.strokeStyle = "rgba(255,80,80,0.06)";
   ctx.lineWidth = 12;
   ctx.strokeRect(tl.x, tl.y, w, h);
   ctx.restore();
@@ -679,8 +624,8 @@ function drawMinimap() {
 
   ctx.save();
 
-  ctx.fillStyle = THEME.minimapBg;
-  ctx.strokeStyle = THEME.minimapBorder;
+  ctx.fillStyle = "rgba(10, 15, 26, 0.75)";
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(mx, my, SIZE, SIZE, 6);
@@ -821,7 +766,7 @@ function drawHeart(cx, cy, size, filled) {
   ctx.bezierCurveTo(size * 0.5, -size, size, -size * 0.3, 0, size * 0.35);
   ctx.closePath();
   if (filled) { ctx.fillStyle = "#ef4444"; ctx.fill(); ctx.strokeStyle = "#991b1b"; }
-  else { ctx.fillStyle = THEME.emptyHeartFill; ctx.fill(); ctx.strokeStyle = THEME.emptyHeartStroke; }
+  else { ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.15)"; }
   ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
 }
 
@@ -830,7 +775,7 @@ const BOOM_RANGE = 84;
 function drawRangeCircle(px, py, playerRadius, zoom, color) {
   const rangeR = (BOOM_RANGE + playerRadius) * zoom;
   ctx.setLineDash([8, 6]); ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5; ctx.globalAlpha = lightMode ? 0.4 : 0.2;
+  ctx.lineWidth = 1.5; ctx.globalAlpha = 0.2;
   ctx.beginPath(); ctx.arc(px, py, rangeR, 0, Math.PI * 2); ctx.stroke();
   ctx.setLineDash([]); ctx.globalAlpha = 1;
 }
@@ -842,8 +787,7 @@ function drawEyes(px, py, r, facing) {
   for (const side of [-1, 1]) {
     const ex = px + perpX * eyeOffset * side + fwdX * r * 0.6;
     const ey = py + perpY * eyeOffset * side + fwdY * r * 0.6;
-    ctx.fillStyle = THEME.eyeWhite; ctx.beginPath(); ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); ctx.fill();
-    if (lightMode) { ctx.strokeStyle = THEME.eyeStroke; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(ex, ey, eyeSize, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#111"; ctx.beginPath();
     ctx.arc(ex + fwdX * eyeSize * 0.35, ey + fwdY * eyeSize * 0.35, pupilSize, 0, Math.PI * 2); ctx.fill();
   }
@@ -890,9 +834,9 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     const badgeR = Math.max(7, r * 0.3);
     ctx.beginPath();
     ctx.arc(px, py, badgeR, 0, Math.PI * 2);
-    ctx.fillStyle = THEME.coinBadgeBg;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fill();
-    ctx.strokeStyle = lightMode ? "#8a6d00" : "#ffd700";
+    ctx.strokeStyle = "#ffd700";
     ctx.lineWidth = Math.max(1.5, badgeR * 0.12);
     ctx.stroke();
 
@@ -900,7 +844,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = THEME.coinText;
+    ctx.fillStyle = "#ffd700";
     ctx.fillText(coins, px, py + 1);
   }
 
@@ -913,7 +857,7 @@ function drawPlayer(player, cameraX, cameraY, zoom, isLocal, dt) {
       const pulse = 0.4 + Math.sin(Date.now() * 0.008) * 0.15;
       ctx.save();
       ctx.globalAlpha = pulse;
-      ctx.strokeStyle = lightMode ? "#1a8aaa" : "#7af0ff";
+      ctx.strokeStyle = "#7af0ff";
       ctx.lineWidth = Math.max(2, r * 0.08);
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -996,7 +940,7 @@ function drawDashTrail(cameraX, cameraY, zoom, r) {
 
 function drawSpeedLines(px, py, r, dirX, dirY, progress) {
   const count = 6; ctx.globalAlpha = Math.max(0, 1 - progress) * 0.6;
-  ctx.strokeStyle = lightMode ? "#3a4a60" : "#ffffff"; ctx.lineWidth = Math.max(1.5, r * 0.04); ctx.lineCap = "round";
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1.5, r * 0.04); ctx.lineCap = "round";
   const perpX = -dirY, perpY = dirX;
   for (let i = 0; i < count; i++) {
     const t = (i / (count - 1)) - 0.5;
@@ -1021,11 +965,11 @@ function drawKillFeed(dt) {
     ctx.globalAlpha = alpha * 0.9; ctx.font = "bold 13px Inter, Arial";
     const text = `${entry.killer}  eliminated  ${entry.victim}`;
     const measured = ctx.measureText(text);
-    ctx.fillStyle = THEME.feedBg;
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
     ctx.beginPath(); ctx.roundRect(x - measured.width - 16, y - 12, measured.width + 16, 24, 6); ctx.fill();
-    ctx.fillStyle = entry.killerColor || THEME.textColor;
+    ctx.fillStyle = entry.killerColor || "#fff";
     ctx.fillText(entry.killer, x - ctx.measureText(`  eliminated  ${entry.victim}`).width, y);
-    ctx.fillStyle = THEME.feedText;
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fillText(`  eliminated  `, x - ctx.measureText(entry.victim).width, y);
     ctx.fillStyle = entry.victimColor || "#ff7a7a";
     ctx.fillText(entry.victim, x, y);
@@ -1041,11 +985,11 @@ function drawDashCooldownIndicator(px, py, r) {
   const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
   const indicatorR = Math.max(8, r * 0.3);
   const ix = px + r + indicatorR + 6, iy = py;
-  ctx.globalAlpha = 0.5; ctx.fillStyle = lightMode ? "rgba(180,190,205,0.8)" : "rgba(0,0,0,0.5)";
+  ctx.globalAlpha = 0.5; ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 0.8; ctx.strokeStyle = lightMode ? "#1a8aaa" : "#7af0ff"; ctx.lineWidth = 2.5;
+  ctx.globalAlpha = 0.8; ctx.strokeStyle = "#7af0ff"; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(ix, iy, indicatorR - 2, -Math.PI * 0.5, -Math.PI * 0.5 + Math.PI * 2 * progress); ctx.stroke();
-  ctx.globalAlpha = 0.7; ctx.fillStyle = lightMode ? "#1a3040" : "#fff";
+  ctx.globalAlpha = 0.7; ctx.fillStyle = "#fff";
   ctx.font = `bold ${Math.max(7, indicatorR * 0.7)}px Inter, Arial`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("\u21e7", ix, iy); ctx.globalAlpha = 1;
@@ -1057,8 +1001,8 @@ function drawBottomHud() {
   const bx = (W - barW) * 0.5, by = H - barH - 16;
 
   ctx.save();
-  ctx.fillStyle = THEME.hudBg;
-  ctx.strokeStyle = THEME.hudBorder;
+  ctx.fillStyle = "rgba(8,12,22,0.65)";
+  ctx.strokeStyle = "rgba(120,160,255,0.18)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(bx, by, barW, barH, 14);
@@ -1086,8 +1030,8 @@ function drawBottomHud() {
       ctx.fillStyle = "#ef4444"; ctx.fill();
       ctx.strokeStyle = "#991b1b"; ctx.lineWidth = 1; ctx.stroke();
     } else {
-      ctx.fillStyle = lightMode ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)"; ctx.fill();
-      ctx.strokeStyle = lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1; ctx.stroke();
 
       if (i === localHp && localHp > 0 && localHitTime) {
         const elapsed = now - localHitTime;
@@ -1111,7 +1055,7 @@ function drawBottomHud() {
 
   const secLeft = localHitTime && localHp < localMaxHp ? Math.max(0, Math.ceil((REGEN_CD - (now - localHitTime)) / 1000)) : 0;
   if (secLeft > 0 && secLeft <= 20) {
-    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.3)";
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(`${secLeft}s`, hsx + heartsW + 2, hsy);
@@ -1124,17 +1068,17 @@ function drawBottomHud() {
   const dashBarW = 60, dashBarH = 8;
   const dashBarY = hsy - dashBarH * 0.5;
 
-  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.06)";
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
   ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW, dashBarH, 4); ctx.fill();
 
   if (dashReady) {
-    ctx.fillStyle = lightMode ? "#1a9ab5" : "#7af0ff";
+    ctx.fillStyle = "#7af0ff";
   } else {
-    ctx.fillStyle = lightMode ? "rgba(26,154,181,0.5)" : "rgba(122,240,255,0.5)";
+    ctx.fillStyle = "rgba(122,240,255,0.5)";
   }
   ctx.beginPath(); ctx.roundRect(dashX, dashBarY, dashBarW * dashProg, dashBarH, 4); ctx.fill();
 
-  ctx.fillStyle = dashReady ? (lightMode ? "#1a9ab5" : "#7af0ff") : (lightMode ? "rgba(26,154,181,0.5)" : "rgba(122,240,255,0.5)");
+  ctx.fillStyle = dashReady ? "#7af0ff" : "rgba(122,240,255,0.5)";
   ctx.font = "bold 9px Inter, Arial";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(dashReady ? "DASH" : "⇧", dashX + dashBarW * 0.5, hsy - 14);
@@ -1143,15 +1087,15 @@ function drawBottomHud() {
   const boomR = 10;
   const boomReady = localHasSpear;
   ctx.beginPath(); ctx.arc(boomX + boomR, hsy, boomR, 0, Math.PI * 2);
-  ctx.fillStyle = boomReady ? (lightMode ? "rgba(100,80,0,0.2)" : "rgba(245,197,66,0.2)") : (lightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.04)");
+  ctx.fillStyle = boomReady ? "rgba(245,197,66,0.2)" : "rgba(255,255,255,0.04)";
   ctx.fill();
-  ctx.strokeStyle = boomReady ? (lightMode ? "#6b5500" : "#f5c542") : (lightMode ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.12)");
+  ctx.strokeStyle = boomReady ? "#f5c542" : "rgba(255,255,255,0.12)";
   ctx.lineWidth = 1.5; ctx.stroke();
 
   if (boomReady) {
     const s = boomR * 0.5, aw = s * 0.22, cx = boomX + boomR, cy = hsy;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI * 0.25);
-    ctx.fillStyle = lightMode ? "#8a6d00" : "#f5c542"; ctx.strokeStyle = lightMode ? "#3a2e00" : "#111"; ctx.lineWidth = 1;
+    ctx.fillStyle = "#f5c542"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1;
     ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(0, aw); ctx.lineTo(s, -s * 0.5 + aw);
@@ -1160,17 +1104,11 @@ function drawBottomHud() {
     ctx.lineTo(-aw, 0); ctx.lineTo(0, aw); ctx.closePath();
     ctx.fill(); ctx.stroke(); ctx.restore();
   } else {
-    ctx.fillStyle = lightMode ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.2)";
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
     ctx.font = "bold 9px Inter, Arial";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("...", boomX + boomR, hsy);
   }
-
-  const themeIcon = lightMode ? "\u2600" : "\u263D";
-  ctx.fillStyle = lightMode ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.18)";
-  ctx.font = "bold 9px Inter, Arial";
-  ctx.textAlign = "right"; ctx.textBaseline = "middle";
-  ctx.fillText(`${themeIcon} L`, bx + barW - 10, by + barH * 0.5);
 
   ctx.restore();
 }
@@ -1200,7 +1138,7 @@ function tick() {
     bgSim.step(dt);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const grd = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.7);
-    grd.addColorStop(0, THEME.menuBgGrad1); grd.addColorStop(1, THEME.menuBgGrad2);
+    grd.addColorStop(0, "#1a1a2e"); grd.addColorStop(1, "#0f0f1a");
     ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 0.6;
     bgSim.draw(ctx, canvas.width, canvas.height);
@@ -1353,7 +1291,7 @@ function tick() {
     const ringWidth = Math.max(4, r * 0.12);
 
     ctx.save();
-    const cashGold = lightMode ? "#6b5500" : "#ffd700";
+    const cashGold = "#ffd700";
     ctx.globalAlpha = 0.25;
     ctx.strokeStyle = cashGold;
     ctx.lineWidth = ringWidth;
